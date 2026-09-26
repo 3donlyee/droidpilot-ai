@@ -66,6 +66,25 @@ export class OpenAICompatProvider implements AIProvider {
 
     if (!res.ok) {
       const text = await res.text();
+      // Some models (e.g. OpenAI via OpenRouter) are region-blocked depending on
+      // which Cloudflare colo egresses the request. Retry once with the regional
+      // fallback model so the agent keeps working from anywhere.
+      if (res.status === 403 && /not available in your region/i.test(text)) {
+        const fb = this.env.OPENAI_REGION_FALLBACK || "meta-llama/llama-3.3-70b-instruct";
+        if (fb && fb !== modelId) {
+          const retry = await fetch(`${baseUrl}/chat/completions`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ ...body, model: fb }),
+          });
+          if (!retry.ok) {
+            const t2 = await retry.text();
+            throw new Error(`AI_HTTP_${retry.status}: ${t2.slice(0, 300)}`);
+          }
+          const d2: any = await retry.json();
+          return { ...parseAnyResponse(d2), style: `openai-compat→fallback:${fb}` };
+        }
+      }
       throw new Error(`AI_HTTP_${res.status}: ${text.slice(0, 300)}`);
     }
     const data: any = await res.json();

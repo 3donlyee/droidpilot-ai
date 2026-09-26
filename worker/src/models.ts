@@ -36,6 +36,17 @@ export const MODELS: ModelEntry[] = [
     enabled: true,
     default: true,
   },
+  {
+    // Regional fallback: some OpenAI models are region-blocked depending on the
+    // Cloudflare colo that egresses the request. Llama on OpenRouter is not.
+    id: "meta-llama/llama-3.3-70b-instruct",
+    displayName: "Llama 3.3 70B (OpenRouter)",
+    provider: "openai-compat",
+    supportsTools: true,
+    supportsVision: false,
+    reasoning: false,
+    enabled: true,
+  },
   // --- Cloudflare Workers AI (disabled — switched to OpenRouter) ---
   {
     id: "@cf/openai/gpt-oss-20b",

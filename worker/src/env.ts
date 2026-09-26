@@ -17,6 +17,8 @@ export interface Env {
   /** Provider API key (OpenRouter: sk-or-v1-…). Set via secret — NEVER in files. */
   OPENAI_API_KEY?: string;
   OPENAI_MODEL_FALLBACK?: string;
+  /** Model used when the primary is region-blocked (HTTP 403 "not available in your region"). */
+  OPENAI_REGION_FALLBACK?: string;
   /** Optional OpenRouter app-attribution overrides */
   OPENROUTER_SITE_URL?: string;
   OPENROUTER_SITE_NAME?: string;
