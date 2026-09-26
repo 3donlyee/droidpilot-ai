@@ -7,8 +7,12 @@
  *
  * provider "cloudflare"     → executed through the env.AI binding (no API key needed)
  * provider "openai-compat"  → executed through any OpenAI-compatible REST API
- *                             (Groq, Ollama, OpenAI, vLLM, Cloudflare REST…)
- *                             Requires OPENAI_BASE_URL + OPENAI_API_KEY secrets.
+ *                             (OpenRouter, Groq, Ollama, OpenAI, vLLM, CF REST…)
+ *                             Requires OPENAI_API_KEY secret; OPENAI_BASE_URL is
+ *                             a public endpoint (set as a plain var).
+ *
+ * CURRENT ACTIVE: openai/gpt-4o via OpenRouter. Cloudflare models are kept
+ * disabled below — flip "enabled" to use them again without any other change.
  */
 export interface ModelEntry {
   id: string;
@@ -23,14 +27,24 @@ export interface ModelEntry {
 
 export const MODELS: ModelEntry[] = [
   {
+    id: "openai/gpt-4o",
+    displayName: "GPT-4o (OpenRouter)",
+    provider: "openai-compat",
+    supportsTools: true,
+    supportsVision: true,
+    reasoning: false,
+    enabled: true,
+    default: true,
+  },
+  // --- Cloudflare Workers AI (disabled — switched to OpenRouter) ---
+  {
     id: "@cf/openai/gpt-oss-20b",
     displayName: "GPT-OSS 20B",
     provider: "cloudflare",
     supportsTools: true,
     supportsVision: false,
     reasoning: true,
-    enabled: true,
-    default: true,
+    enabled: false,
   },
   {
     id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
@@ -39,7 +53,7 @@ export const MODELS: ModelEntry[] = [
     supportsTools: true,
     supportsVision: false,
     reasoning: false,
-    enabled: true,
+    enabled: false,
   },
   {
     id: "@cf/meta/llama-4-scout-17b-16e-instruct",
@@ -48,18 +62,8 @@ export const MODELS: ModelEntry[] = [
     supportsTools: true,
     supportsVision: true,
     reasoning: false,
-    enabled: false, // enable when you need a vision-capable model
+    enabled: false,
   },
-  // Example for a future external provider (fill secrets first):
-  // {
-  //   id: "llama-3.3-70b-versatile",
-  //   displayName: "Llama 3.3 70B (Groq)",
-  //   provider: "openai-compat",
-  //   supportsTools: true,
-  //   supportsVision: false,
-  //   reasoning: false,
-  //   enabled: false,
-  // },
 ];
 
 export function getModel(id: string): ModelEntry | undefined {

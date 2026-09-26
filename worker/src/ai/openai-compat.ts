@@ -3,10 +3,11 @@ import type { Env } from "../env";
 import { parseAnyResponse } from "./workers-ai";
 
 /**
- * OpenAI-compatible provider — for Groq, OpenAI, Ollama, vLLM, or Cloudflare's
- * OpenAI-compatible REST endpoint (/ai/v1). Requires secrets:
- *   OPENAI_BASE_URL   e.g. https://api.groq.com/openai/v1
+ * OpenAI-compatible provider — for OpenRouter, Groq, OpenAI, Ollama, vLLM, or
+ * Cloudflare's OpenAI-compatible REST endpoint (/ai/v1). Requires secret:
  *   OPENAI_API_KEY    provider API key
+ * Base URL is a public endpoint, set as a plain var:
+ *   OPENAI_BASE_URL   e.g. https://openrouter.ai/api/v1
  */
 export class OpenAICompatProvider implements AIProvider {
   name = "openai-compat";
@@ -47,12 +48,19 @@ export class OpenAICompatProvider implements AIProvider {
     };
     if (tools.length) body.tools = tools;
 
+    const headers: Record<string, string> = {
+      "content-type": "application/json",
+      authorization: `Bearer ${apiKey}`,
+    };
+    // OpenRouter app attribution (optional but recommended by their docs).
+    if (/openrouter\.ai/.test(baseUrl)) {
+      headers["HTTP-Referer"] = this.env.OPENROUTER_SITE_URL ?? "https://droidpilot-ai.turkjgastroenterol-org.workers.dev";
+      headers["X-Title"] = this.env.OPENROUTER_SITE_NAME ?? "DroidPilot AI";
+    }
+
     const res = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${apiKey}`,
-      },
+      headers,
       body: JSON.stringify(body),
     });
 
