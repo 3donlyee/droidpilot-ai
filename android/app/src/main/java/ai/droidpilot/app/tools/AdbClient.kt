@@ -152,7 +152,7 @@ class AdbClient private constructor(
                 A_OKAY -> remoteId = m.arg0
                 A_WRTE -> {
                     out.append(String(m.data, Charsets.UTF_8))
-                    if (remoteId > 0) writeMsg(A_OKAY, localId, remoteId)
+                    if (remoteId > 0) writeMsg(A_OKAY, localId, remoteId, ByteArray(0))
                     if (out.length > 128_000) return out.toString()
                 }
                 A_CLSE -> return out.toString()

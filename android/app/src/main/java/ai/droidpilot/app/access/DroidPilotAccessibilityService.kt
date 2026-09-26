@@ -1,5 +1,6 @@
 package ai.droidpilot.app.access
 
+import android.accessibilityservice.AccessibilityButtonController
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.graphics.Path
@@ -39,6 +40,25 @@ class DroidPilotAccessibilityService : AccessibilityService() {
         // genuinely enabled on the device.
         instance = this
         LogSystem.log("a11y", "accessibility service connected — instance registered")
+        // Accessibility button → Aiminos Voice Panel (🎤 talk / ⏹ stop / ▶ resume).
+        // Registered through AccessibilityButtonController — the documented API for
+        // handling accessibility-button clicks (flagRequestAccessibilityButton).
+        try {
+            accessibilityButtonController.registerAccessibilityButtonCallback(
+                object : AccessibilityButtonController.AccessibilityButtonCallback() {
+                    override fun onClicked(controller: AccessibilityButtonController) {
+                        VoicePanel.toggle(this@DroidPilotAccessibilityService)
+                    }
+
+                    override fun onAvailabilityChanged(
+                        controller: AccessibilityButtonController,
+                        available: Boolean
+                    ) {}
+                }
+            )
+        } catch (_: Exception) {
+            LogSystem.log("a11y", "accessibility button callback unavailable on this device")
+        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -48,15 +68,6 @@ class DroidPilotAccessibilityService : AccessibilityService() {
             // Foreground app changed → previous tree snapshot is no longer valid.
             lastTreeHash = null
         }
-    }
-
-    /**
-     * The Accessibility button (floating / navbar) → Aiminos Voice Panel:
-     * 🎤 talk (STT → brain → TTS) · ⏹ stop task · ▶ resume.
-     * Requires flagRequestAccessibilityButton in the service config.
-     */
-    override fun onAccessibilityButtonClicked() {
-        VoicePanel.toggle(this)
     }
 
     override fun onInterrupt() {}
@@ -85,11 +96,6 @@ class DroidPilotAccessibilityService : AccessibilityService() {
             root = rootInActiveWindow
         }
         return root
-    }
-
-    override fun onDestroy() {
-        instance = null
-        super.onDestroy()
     }
 
     /** Foreground package (best-effort, from the active window root). */
