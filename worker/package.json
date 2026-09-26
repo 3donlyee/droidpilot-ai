@@ -1,0 +1,17 @@
+{
+  "name": "droidpilot-worker",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker orchestrating AI tool execution and Android device bridge for DroidPilot AI",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "build": "tsc --noEmit"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241230.0",
+    "typescript": "^5.7.2",
+    "wrangler": "^3.101.0"
+  }
+}

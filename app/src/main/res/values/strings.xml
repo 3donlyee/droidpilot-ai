@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">DroidPilot AI</string>
+    <string name="accessibility_service_label">DroidPilot AI Agent Automation</string>
+    <string name="accessibility_service_description">Enables DroidPilot AI to inspect screen UI elements, execute autonomous gestures (tap, swipe), and interact with apps on your behalf.</string>
+</resources>

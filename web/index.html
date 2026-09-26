@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DroidPilot AI — Web Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <span class="logo-icon">⚡</span>
+        <h1>DroidPilot AI</h1>
+      </div>
+      <div class="header-badges">
+        <div class="badge badge-worker" id="workerBadge">● Worker Ready</div>
+        <div class="badge badge-device" id="deviceBadge">○ Device Disconnected</div>
+      </div>
+    </header>
+
+    <div class="layout-grid">
+      <!-- Left / Configuration Column -->
+      <aside class="sidebar">
+        <!-- AI Model Selector -->
+        <div class="card">
+          <h3>🤖 نموذج الذكاء الاصطناعي (AI Model)</h3>
+          <div class="form-group">
+            <select id="modelSelector">
+              <option value="@cf/openai/gpt-oss-20b">GPT-OSS 20B (Reasoning + Tools)</option>
+              <option value="@cf/meta/llama-3.3-70b-instruct">Llama 3.3 70B Instruct</option>
+              <option value="@cf/meta/llama-3.1-8b-instruct">Llama 3.1 8B Instruct</option>
+            </select>
+          </div>
+          <div class="capabilities-box">
+            <div><b>Provider:</b> Cloudflare Workers AI</div>
+            <div><b>Capabilities:</b> <span class="text-green">✓ Reasoning</span> • <span class="text-cyan">✓ Tool Calling</span> • <span class="text-dim">✗ Vision</span></div>
+            <div><b>Status:</b> <span class="text-green">● Available</span></div>
+          </div>
+        </div>
+
+        <!-- Device Pairing -->
+        <div class="card">
+          <h3>📱 اقتران الهاتف (Device Pairing)</h3>
+          <p class="card-desc">أدخل رمز PIN المكون من 6 أرقام المعروض على تطبيق DroidPilot في هاتفك:</p>
+          <div class="pairing-form">
+            <input type="text" id="pinInput" placeholder="482913" maxlength="6">
+            <button class="btn btn-primary" onclick="pairDevice()">اقتران</button>
+          </div>
+          <div class="device-card-info" id="pairedDeviceInfo">
+            <div><b>الجهاز المستهدف:</b> OPPO Reno5 (CPH2159)</div>
+            <div><b>النظام:</b> Android 13 (ColorOS / No Root)</div>
+            <div><b>طريقة التحكم:</b> AccessibilityService + Gestures</div>
+          </div>
+        </div>
+
+        <!-- Quick Autonomous Actions -->
+        <div class="card">
+          <h3>🚀 سيناريوهات التشغيل السريع</h3>
+          <div class="quick-btns">
+            <button class="btn btn-outline" onclick="triggerPreset('افتح TikTok وانتقل للفيديو التالي')">🎬 فتح TikTok والتمرير للتالي</button>
+            <button class="btn btn-outline" onclick="triggerPreset('افحص عناصر الشاشة وأعطني العناصر القابلة للنقر')">🔍 فحص عقد الشاشة الحالية</button>
+            <button class="btn btn-outline" onclick="triggerPreset('اعرض معلومات الهاتف وحالة البطارية')">📊 فحص حالة الهاتف</button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Center & Right: Chat & Live Debug Console -->
+      <main class="main-content">
+        <!-- Autonomous Chat View -->
+        <div class="card chat-card">
+          <h3>💬 محادثة الوكيل المستقل (Autonomous Agent)</h3>
+          <div class="chat-messages" id="chatMessages">
+            <div class="chat-bubble ai-bubble">
+              مرحباً بك! أنا DroidPilot AI. أستطيع التحكم في تطبيقات هاتفك مثل TikTok وقراءة الشاشة وتنفيذ الإيماءات تلقائياً. ما الذي تود القيام به؟
+            </div>
+          </div>
+          <div class="chat-input-bar">
+            <input type="text" id="chatInput" placeholder="اكتب أمراً للوكيل (مثال: افتح TikTok وانتقل للفيديو التالي)...">
+            <button class="btn btn-primary" onclick="sendMessage()">إرسال</button>
+          </div>
+        </div>
+
+        <!-- Live Debug Log Console -->
+        <div class="card log-card">
+          <div class="log-header">
+            <h3>🖥️ سجل الأحداث الحي (LIVE LOG)</h3>
+            <button class="btn-sm" onclick="clearLogs()">مسح</button>
+          </div>
+          <div class="log-terminal" id="logTerminal">
+            <div class="log-entry log-sys">[00:00:00] SYSTEM: Web Dashboard connected to DroidPilot Engine.</div>
+            <div class="log-entry log-ai">[00:00:01] AI: Loaded @cf/openai/gpt-oss-20b Model Registry.</div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
