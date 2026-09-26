@@ -281,13 +281,9 @@ class ToolExecutor(private val context: Context) {
         val deferred = CompletableDeferred<Bitmap?>()
         val executor = ContextCompat.getMainExecutor(context)
         val callback = object : AccessibilityService.TakeScreenshotCallback {
-            override fun onScreenshotCaptured(
-                resultCode: Int,
-                screenshot: AccessibilityService.ScreenshotResult
-            ) {
+            override fun onSuccess(screenshot: AccessibilityService.ScreenshotResult) {
                 try {
-                    // SCREENSHOT_RESULT_SUCCESS == 0
-                    val hw = if (resultCode == 0) screenshot.hardwareBuffer else null
+                    val hw = screenshot.hardwareBuffer
                     val bm: Bitmap? = if (hw != null) {
                         val wrapped = Bitmap.wrapHardwareBuffer(
                             hw, ColorSpace.get(ColorSpace.Named.SRGB)
@@ -300,6 +296,10 @@ class ToolExecutor(private val context: Context) {
                 } catch (_: Throwable) {
                     deferred.complete(null)
                 }
+            }
+
+            override fun onFailure(errorCode: Int) {
+                deferred.complete(null)
             }
         }
         try {
