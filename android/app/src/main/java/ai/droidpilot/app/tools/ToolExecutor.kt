@@ -281,9 +281,13 @@ class ToolExecutor(private val context: Context) {
         val deferred = CompletableDeferred<Bitmap?>()
         val executor = ContextCompat.getMainExecutor(context)
         try {
-            s.takeScreenshot(Display.DEFAULT_DISPLAY, executor) { r ->
+            s.takeScreenshot(Display.DEFAULT_DISPLAY, executor) { resultCode, shot ->
                 try {
-                    val hw = r.hardwareBuffer
+                    if (resultCode != AccessibilityService.SCREENSHOT_RESULT_SUCCESS) {
+                        deferred.complete(null)
+                        return@takeScreenshot
+                    }
+                    val hw = shot.hardwareBuffer
                     val bm: Bitmap? = if (hw != null) {
                         val wrapped = Bitmap.wrapHardwareBuffer(
                             hw, ColorSpace.get(ColorSpace.Named.SRGB)
