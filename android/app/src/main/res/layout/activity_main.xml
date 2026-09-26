@@ -74,7 +74,7 @@
             android:id="@+id/etUrl"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="https://droidpilot-ai.<your-subdomain>.workers.dev"
+            android:hint="https://droidpilot-ai.your-subdomain.workers.dev"
             android:inputType="textUri"
             android:textColor="@color/text_main"
             android:textColorHint="@color/text_dim" />
