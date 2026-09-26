@@ -1,6 +1,0 @@
-{
-  "name": "DroidPilot AI",
-  "description": "Android AI Agent for autonomous device control, accessibility automation, and AI tool execution.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}

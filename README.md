@@ -1,107 +1,170 @@
-# DroidPilot AI ⚡
+# DroidPilot AI
 
-**DroidPilot AI** is an autonomous Android AI Agent that bridges Cloudflare Workers AI with an Android device to control apps, parse UI accessibility hierarchies, and execute multi-step tools autonomously.
+> **Android AI Agent** powered by Cloudflare Workers AI — controlled via natural language, executes on the device through Accessibility / Gesture / Android APIs.
 
-Targeted and tested for **OPPO Reno5 (CPH2159, Android 13, ColorOS, No Root)** with zero reliance on root or Shizuku for the core MVP.
-
----
-
-## 🌟 Key Features
-
-- **Autonomous Tool Calling Loop**: User prompt → Cloudflare Worker AI → Function Call → Android Agent → Accessibility API / Gestures → TikTok / Target App → Result → AI Model (up to 20 turns with infinite-loop prevention).
-- **Accessibility Engine**:
-  - `get_screen_nodes()` with compact JSON, deduplication, hash caching, and diffing.
-  - Smooth gestures: `swipe_up()`, `swipe_down()`, `tap_element()`, `press_back()`.
-  - Input management: `type_text()`.
-- **Strict Screenshot Policy**: Zero-screenshot reliance for normal workflows. High-speed Accessibility node tree evaluation is primary; screenshots are used strictly as a secondary fallback on demand.
-- **Model Registry (`models.ts`)**: Decoupled AIProvider supporting:
-  - `@cf/openai/gpt-oss-20b` (Reasoning + Tools)
-  - `@cf/meta/llama-3.3-70b-instruct`
-  - `@cf/meta/llama-3.1-8b-instruct`
-  - Extensible to Groq, Local AI, and Ollama.
-- **Device Pairing**: Secure 6-digit PIN pairing (`DROID-XXXX` + PIN) between Android app and Web Dashboard.
-- **Optional ADB Bridge & Shell Policy**:
-  - `SAFE`: `getprop`, `pm list packages`, `dumpsys`, `input swipe`, `input tap`, `date`, `uptime`
-  - `REQUIRES_CONFIRMATION`: custom execution
-  - `BLOCKED`: `rm`, `factory reset`, destructive commands
-- **Live Debug Console**: Real-time event log stream with source filters (`ALL`, `SYSTEM`, `ACCESSIBILITY`, `AI`, `TOOL`, `WORKER`).
+```
+USER  →  Web UI  →  Cloudflare Worker  →  Workers AI
+                                         ↓ (function/tool call)
+                                    Android DroidPilot
+                                         ↓
+                          Accessibility / Android APIs / optional ADB
+                                         ↓
+                                TikTok / any app
+                                         ↓
+                                      Result
+                                         ↓
+                                        AI
+                                         ↓
+                                       USER
+```
 
 ---
 
-## 📁 Repository Structure
+## ✨ Features
+
+| Capability | Status |
+|------------|--------|
+| Accessibility tree reading (text, bounds, clickable, actions) | ✅ Phase 1 |
+| Tools: open_app, swipe, tap, type, back, screenshot, shell | ✅ Phase 1 |
+| Foreground service with notification | ✅ Phase 1 |
+| Cloudflare Worker + Workers AI binding | ✅ Phase 2 |
+| Device pairing (PIN-based) | ✅ Phase 3 |
+| AI Tool Calling loop (max 20 calls/turn) | ✅ Phase 4 |
+| Model Registry + Selector | ✅ Phase 5 |
+| Web UI with chat + live debug console | ✅ Phase 6 |
+| Optional ADB bridge (no root, no Shizuku) | ✅ Phase 7 |
+| No root required | ✅ |
+| No Shizuku required (MVP) | ✅ |
+
+---
+
+## 📱 Target Device (tested)
+
+- **OPPO Reno5 (CPH2159)**
+- Android 13, ARM64, ColorOS
+- No Root
+
+Should work on most Android 10+ devices with Accessibility permission.
+
+---
+
+## 🗂 Repository structure
 
 ```
 droidpilot-ai/
-├── app/                  # Android APK Source (Kotlin, Jetpack Compose, Room, Accessibility)
-│   ├── src/main/java/com/example/
-│   │   ├── data/         # Models, Room DAOs, Entities, Repository
-│   │   ├── engine/       # DeviceManager, ToolExecutor, CommandValidator, AdbBridge
-│   │   ├── service/      # DroidPilotAccessibilityService, DroidPilotAgentService
-│   │   ├── network/      # CloudflareClient (REST & Polling)
-│   │   └── ui/           # Jetpack Compose Cybernetic M3 UI & ViewModels
-├── worker/               # Cloudflare Worker (TypeScript, Workers AI, Tool Orchestrator)
-│   ├── src/
-│   │   ├── index.ts      # Main Router, Tool Loop, Web UI server
-│   │   ├── models.ts     # Model Registry
-│   │   ├── tools.ts      # Tool Definitions & JSON Schemas
-│   │   ├── ai.ts         # AIProvider abstraction
-│   │   └── pairing.ts    # Device Session & Command Queue
-│   ├── wrangler.jsonc    # Cloudflare Worker Configuration (AI binding)
-│   └── package.json
-├── web/                  # Web Dashboard (HTML5, Modern Cybernetic CSS, JS)
-│   ├── index.html
-│   ├── style.css
-│   └── app.js
-├── docs/                 # Documentation
-│   ├── ARCHITECTURE.md   # Architectural design & communication protocol
-│   ├── TIKTOK_FLOW.md    # TikTok autonomous CUJ walkthrough
-│   └── DEPLOYMENT.md     # Deployment commands and configuration
-├── metadata.json
+├── android/        # Kotlin Android app (Accessibility Agent + Tool Executor)
+├── worker/         # Cloudflare Worker (TypeScript) — AI orchestration + device routing
+├── web/            # Static Web UI (chat + debug console)
+├── docs/           # Architecture, deployment, security, API docs
 └── README.md
 ```
 
 ---
 
-## 🚀 Quick Start & Installation
+## 🚀 Quick start
 
-### 1. Build Android APK
-```bash
-gradle :app:assembleDebug
-```
-The APK is generated at `app/build/outputs/apk/debug/app-debug.apk`. Install it on your OPPO Reno5 (or any Android 8.0+ device).
+### 1) Cloudflare Worker (backend)
 
-### 2. Enable Accessibility Service
-1. On phone, go to **Settings > Accessibility**.
-2. Turn on **DroidPilot AI Agent Automation**.
-3. Open the app to view your **Pairing PIN** (e.g. `482913`).
-
-### 3. Deploy Cloudflare Worker
 ```bash
 cd worker
 npm install
-npm run deploy
+cp .dev.vars.example .dev.vars      # then edit local secrets (NEVER commit)
+npm run dev                         # local dev on http://localhost:8787
+npm run deploy                      # deploy to Cloudflare
 ```
 
+Set production secrets via wrangler (NOT in source):
+
+```bash
+npx wrangler secret put DEVICE_AUTH_SECRET
+npx wrangler secret put OPENAI_API_KEY        # optional, only if using OpenAI provider
+```
+
+### 2) Android app (APK)
+
+```bash
+cd android
+# Open in Android Studio, or build via Gradle wrapper:
+./gradlew assembleDebug
+# APK: android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+See **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** for full instructions including
+Accessibility permission setup, foreground service, and pairing with the Worker.
+
+### 3) Web UI
+
+Open `web/index.html` in a browser, or serve statically:
+
+```bash
+cd web && npx serve .
+```
+
+Enter your Worker URL + pairing PIN → start chatting with your device.
+
 ---
 
-## 🎬 TikTok Autonomous Test Flow
+## 🔐 Security model
 
-1. In the Web UI or Android Chat, enter:
-   ```
-   "افتح TikTok وانتقل للفيديو التالي"
-   ```
-2. DroidPilot executes:
-   1. `open_app("TikTok")` → launches `com.zhiliaoapp.musically`
-   2. `get_current_package()` → confirms TikTok is foregrounded
-   3. `get_screen_nodes()` → parses screen UI hierarchy
-   4. `swipe_up()` → dispatches smooth upward gesture
-   5. `get_screen_nodes()` → confirms next video is loaded
-3. AI reports success to the user — completely without screenshots!
+- **No secrets in APK / GitHub / source / wrangler.jsonc / README.**
+- All secrets live in Cloudflare Secrets or environment variables.
+- Device pairing uses short-lived PIN + per-device secret.
+- HTTPS/WSS only. Rate limiting + command allowlist + audit logs.
+- Shell commands are classified `SAFE / REQUIRES_CONFIRMATION / BLOCKED`.
+- Screenshots are **not** sent continuously — captured on demand only.
+
+See **[docs/SECURITY.md](docs/SECURITY.md)** for full policy.
 
 ---
 
-## 🔒 Security & Credential Notice
+## 🤖 AI Models
 
-- **No Hardcoded Secrets**: Secrets and tokens are never committed to git or hardcoded into the APK.
-- **Dynamic Configuration**: The Android app includes a Settings modal to update the Cloudflare Worker URL and rotate API keys anytime at runtime.
-- **Temporary Deployment Keys**: Any disposable temporary tokens provided for initial deployment should be deleted/revoked immediately after verification.
+The Model Registry (`worker/src/models/registry.ts`) defines all available models.
+Adding a model = adding one entry — no code changes elsewhere.
+
+Default: `@cf/openai/gpt-oss-20b` (Workers AI, free tier).
+
+Provider abstraction (`AIProvider`) lets you add Groq / OpenAI / Ollama / Local LLM
+without rewriting the agent engine.
+
+---
+
+## 🛠 Tools
+
+| Tool | Description |
+|------|-------------|
+| `get_device_info` | Model, OS, screen size, battery |
+| `get_current_package` | Foreground app package name |
+| `get_screen_nodes` | Accessibility tree (compact JSON) |
+| `open_app(package_name)` | Launch an app |
+| `swipe_up` / `swipe_down` | Vertical gestures |
+| `tap_element(element_id)` | Tap an accessibility node |
+| `press_back` | System back |
+| `type_text(text)` | Input text into focused field |
+| `take_screenshot` | On-demand screenshot (not continuous) |
+| `run_shell(command)` | Shell with SAFE/CONFIRM/BLOCKED policy |
+| `get_logs` | Recent device logs |
+
+See **[docs/API.md](docs/API.md)** for full protocol.
+
+---
+
+## 📚 Documentation
+
+- [Architecture](docs/ARCHITECTURE.md)
+- [Deployment guide](docs/DEPLOYMENT.md)
+- [Security policy](docs/SECURITY.md)
+- [API / Protocol reference](docs/API.md)
+
+---
+
+## ⚠️ Disclaimer
+
+This project controls a real Android device via Accessibility. Use only on devices
+you own. The authors are not responsible for misuse.
+
+---
+
+## 📄 License
+
+MIT — see [LICENSE](LICENSE).

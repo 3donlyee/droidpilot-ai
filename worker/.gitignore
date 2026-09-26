@@ -1,0 +1,14 @@
+# Node
+node_modules/
+
+# Wrangler
+.wrangler/
+.dev.vars
+.dev.vars.*
+
+# Build artifacts
+dist/
+
+# Editor / OS
+.DS_Store
+*.log

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  DroidPilot AI — adaptive launcher icon foreground (robot glyph).
+  Adaptive icons require a foreground drawable sized at 108x108dp where
+  the visible content lives in the center 72x72dp safe zone.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Body (rounded square head) -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M54,28C40.2,28 29,39.2 29,53v16c0,3.3 2.7,6 6,6h38c3.3,0 6,-2.7 6,-6V53C79,39.2 67.8,28 54,28z" />
+    <!-- Eyes -->
+    <path
+        android:fillColor="#FF00897B"
+        android:pathData="M44,55m-5,0a5,5 0 1,0 10,0a5,5 0 1,0 -10,0" />
+    <path
+        android:fillColor="#FF00897B"
+        android:pathData="M64,55m-5,0a5,5 0 1,0 10,0a5,5 0 1,0 -10,0" />
+    <!-- Antenna -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M54,18L52,28h4z" />
+    <!-- Mouth -->
+    <path
+        android:fillColor="#FF7E57C2"
+        android:pathData="M46,65h16v3H46z" />
+</vector>

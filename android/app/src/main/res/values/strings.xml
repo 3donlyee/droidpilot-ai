@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App identity -->
+    <string name="app_name">DroidPilot AI</string>
+    <string name="accessibility_service_label">DroidPilot AI</string>
+    <string name="accessibility_service_description">Allows DroidPilot AI to read the on-screen content of any app and perform gestures (tap, swipe, type) on your behalf when you issue a command through the DroidPilot web UI. The service does not transmit personal data without your explicit command.</string>
+
+    <!-- Notification -->
+    <string name="notification_channel_id">droidpilot_command_channel</string>
+    <string name="notification_channel_name">DroidPilot AI Command Channel</string>
+    <string name="notification_channel_description">Persistent notification keeping the DroidPilot AI command channel connected to the Cloudflare Worker.</string>
+    <string name="notification_title">DroidPilot AI</string>
+    <string name="notification_text_connected">DroidPilot AI is connected</string>
+    <string name="notification_text_connecting">DroidPilot AI is connecting…</string>
+    <string name="notification_text_disconnected">DroidPilot AI is disconnected</string>
+
+    <!-- Main UI -->
+    <string name="title_main">DroidPilot AI</string>
+    <string name="subtitle_main">Android AI Agent</string>
+
+    <string name="button_enable_accessibility">Enable Accessibility</string>
+    <string name="button_start_service">Start Service</string>
+    <string name="button_stop_service">Stop Service</string>
+    <string name="button_pair">Pair</string>
+
+    <string name="label_worker_url">Worker URL</string>
+    <string name="hint_worker_url">https://droidpilot-ai.YOUR-SUBDOMAIN.workers.dev</string>
+
+    <string name="label_status">Status</string>
+    <string name="status_disconnected">Disconnected</string>
+    <string name="status_connecting">Connecting…</string>
+    <string name="status_paired">Paired (offline)</string>
+    <string name="status_connected">Connected</string>
+
+    <string name="label_device_id">Device ID</string>
+    <string name="label_pairing_code">Pairing Code</string>
+    <string name="value_unknown">—</string>
+
+    <string name="label_log">Log</string>
+
+    <!-- Toasts -->
+    <string name="toast_worker_url_required">Please enter the Worker URL first.</string>
+    <string name="toast_pairing_started">Pairing with Worker…</string>
+    <string name="toast_pairing_failed">Pairing failed: %1$s</string>
+    <string name="toast_pairing_success">Paired successfully. Device ID: %1$s</string>
+    <string name="toast_service_started">Foreground service started</string>
+    <string name="toast_service_stopped">Foreground service stopped</string>
+    <string name="toast_accessibility_not_enabled">Accessibility service is not enabled yet</string>
+    <string name="toast_accessibility_enabled">Accessibility service is active</string>
+
+    <!-- Accessibility config -->
+    <string name="accessibility_no_feedback">No feedback</string>
+</resources>

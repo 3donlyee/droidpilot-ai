@@ -1,0 +1,29 @@
+#!/usr/bin/env sh
+# DroidPilot AI — minimal gradlew stub
+#
+# This is a fallback shell entry point. It does NOT contain the actual
+# Gradle wrapper launcher (gradle-wrapper.jar is intentionally absent
+# because it cannot be downloaded here).
+#
+# Recommended: regenerate the real wrapper once before first build:
+#     gradle wrapper --gradle-version 8.9
+# or run ./bootstrap.sh from this directory.
+#
+# After regeneration, Android Studio / ./gradlew will work normally.
+
+DIR="$(cd "$(dirname "$0")" && pwd)"
+
+if [ ! -f "$DIR/gradle/wrapper/gradle-wrapper.jar" ]; then
+  echo "[DroidPilot] gradle-wrapper.jar is missing."
+  echo "[DroidPilot] Run 'gradle wrapper --gradle-version 8.9' (or ./bootstrap.sh) once."
+  echo "[DroidPilot] Falling back to system 'gradle' if available..."
+  if command -v gradle >/dev/null 2>&1; then
+    exec gradle "$@"
+  fi
+  echo "[DroidPilot] ERROR: gradle not found on PATH. Install Gradle or run bootstrap.sh."
+  exit 1
+fi
+
+# If the wrapper jar exists, delegate to the standard launcher logic.
+# (Minimal inline re-implementation of the standard gradlew entrypoint.)
+exec java -classpath "$DIR/gradle/wrapper/gradle-wrapper.jar" org.gradle.wrapper.GradleWrapperMain "$@"

@@ -1,24 +1,72 @@
-*.iml
-.gradle
-.kotlin
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
-local.properties
+# ===========================================
+# DroidPilot AI - .gitignore
+# NEVER commit secrets, keys, credentials
+# ===========================================
+
+# --- Secrets / Credentials (HARD BLOCK) ---
 .env
-debug.keystore
-debug.keystore.base64
-.build-outputs/
-node_modules/
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+secrets.json
+secrets.yaml
+*credentials*
+*secret*
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+google-services.json
+agp-config.json
+
+# --- Cloudflare ---
 .wrangler/
-dist/
+wrangler.toml.local
+.mf/
+
+# --- Android / Gradle ---
+android/.grad/
+android/build/
+android/app/build/
+android/local.properties
+android/keystores/
+android/*.iml
+android/.idea/
+android/captures/
+android/.cxx/
+android/app/release/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+
+# --- Kotlin / Java ---
+*.kt.bak
+hs_err_pid*
+
+# --- Node / TypeScript ---
+worker/node_modules/
+worker/dist/
+worker/.tsbuildinfo
+web/node_modules/
+web/dist/
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# --- Logs ---
 *.log
+logs/
+npm-debug.log*
+
+# --- OS ---
+.directory

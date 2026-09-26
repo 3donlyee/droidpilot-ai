@@ -1,12 +1,45 @@
 {
+  // DroidPilot AI — Cloudflare Worker configuration.
+  // Format: JSONC (JSON with comments).
+  //
+  // SECRETS: do NOT put any secrets in this file. All secrets (DEVICE_AUTH_SECRET,
+  // OPENAI_API_KEY) are managed via `wrangler secret put ...` and stored in
+  // Cloudflare's encrypted secret store. They appear as fields on the Env
+  // interface at runtime but are never written to source or wrangler.jsonc.
+  //
+  // KV NAMESPACE: create the `DEVICE_SESSIONS` namespace via
+  //   npx wrangler kv namespace create DEVICE_SESSIONS
+  // then paste the returned `id` below in place of REPLACE_WITH_KV_ID.
+  //
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "droidpilot-worker",
+  "name": "droidpilot-ai",
   "main": "src/index.ts",
-  "compatibility_date": "2024-12-30",
+  "compatibility_date": "2025-09-01",
   "compatibility_flags": ["nodejs_compat"],
+
+  // Workers AI binding — exposes `env.AI` at runtime.
   "ai": {
     "binding": "AI"
   },
+
+  // KV namespace for pairing codes, redeemed device records, and rate-limit
+  // buckets. Replace the placeholder id before deploying.
+  "kv_namespaces": [
+    {
+      "binding": "DEVICE_SESSIONS",
+      "id": "REPLACE_WITH_KV_ID"
+    }
+  ],
+
+  // Non-secret configuration vars. Override per-environment via
+  //   wrangler deploy --env production  (with [env.production] overrides)
+  // or via the Cloudflare dashboard.
+  "vars": {
+    "MAX_TOOL_CALLS_PER_TURN": "20",
+    "DEFAULT_MODEL_ID": "@cf/openai/gpt-oss-20b",
+    "ALLOWED_ORIGIN": "*"
+  },
+
   "observability": {
     "enabled": true
   }

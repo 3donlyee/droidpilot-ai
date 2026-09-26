@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  DroidPilot AI — notification icon (simple robot / pilot glyph, white on transparent).
+  24dp vector drawable, designed to look good at small notification sizes.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFFFF">
+    <!-- head -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,2C7.58,2 4,5.58 4,10v6c0,1.1 0.9,2 2,2h12c1.1,0 2,-0.9 2,-2v-6c0,-4.42 -3.58,-8 -8,-8zM8,13c-0.83,0 -1.5,-0.67 -1.5,-1.5S7.17,10 8,10s1.5,0.67 1.5,1.5S8.83,13 8,13zM16,13c-0.83,0 -1.5,-0.67 -1.5,-1.5S15.17,10 16,10s1.5,0.67 1.5,1.5S16.83,13 16,13z" />
+    <!-- antenna -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,0.5L11,2h2z" />
+    <!-- body line -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M6,20h12v2H6z" />
+</vector>
