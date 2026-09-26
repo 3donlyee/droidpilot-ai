@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">DroidPilot AI</string>
-    <string name="a11y_description">DroidPilot AI uses this service to observe the current screen and execute actions (tap, swipe, type) requested by the user through the DroidPilot AI agent. All actions are logged and policy-validated.</string>
+    <string name="app_name">Aiminos</string>
+    <string name="a11y_description">Aiminos يستخدم هذه الخدمة لقراءة الشاشة الحالية وتنفيذ الأفعال المطلوبة (ضغط، تمرير، كتابة) عبر عقلها المدبّر. كل الأفعال مسجَّلة ومصنَّفة آمنة أو محظورة، وزر الإتاحة يفتح لوحة الصوت (تكلم / إيقاف / متابعة).</string>
 </resources>

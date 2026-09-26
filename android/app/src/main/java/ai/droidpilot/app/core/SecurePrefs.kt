@@ -53,6 +53,20 @@ class SecurePrefs(context: Context) {
         get() = prefs.getBoolean("allow_insecure_local", false)
         set(v) = prefs.edit().putBoolean("allow_insecure_local", v).apply()
 
+    /** ADB deep-control mode (user opt-in from Settings row). */
+    var adbEnabled: Boolean
+        get() = prefs.getBoolean("adb_enabled", false)
+        set(v) = prefs.edit().putBoolean("adb_enabled", v).apply()
+
+    /** RSA-2048 keypair for ADB auth (PKCS8 private, X509 public, Base64). */
+    var adbKeyPriv: String?
+        get() = prefs.getString("adb_key_priv", null)
+        set(v) = prefs.edit().putString("adb_key_priv", v).apply()
+
+    var adbKeyPub: String?
+        get() = prefs.getString("adb_key_pub", null)
+        set(v) = prefs.edit().putString("adb_key_pub", v).apply()
+
     fun clearCredentials() {
         deviceId = null
         deviceSecret = null

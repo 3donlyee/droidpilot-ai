@@ -50,6 +50,15 @@ class DroidPilotAccessibilityService : AccessibilityService() {
         }
     }
 
+    /**
+     * The Accessibility button (floating / navbar) → Aiminos Voice Panel:
+     * 🎤 talk (STT → brain → TTS) · ⏹ stop task · ▶ resume.
+     * Requires flagRequestAccessibilityButton in the service config.
+     */
+    override fun onAccessibilityButtonClicked() {
+        VoicePanel.toggle(this)
+    }
+
     override fun onInterrupt() {}
 
     override fun onUnbind(intent: android.content.Intent?): Boolean {
@@ -57,6 +66,11 @@ class DroidPilotAccessibilityService : AccessibilityService() {
         instance = null
         LogSystem.log("a11y", "accessibility service unbound")
         return super.onUnbind(intent)
+    }
+
+    override fun onDestroy() {
+        instance = null
+        super.onDestroy()
     }
 
     /**

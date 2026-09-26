@@ -1,65 +1,138 @@
 <!doctype html>
-<html lang="en">
+<html lang="ar" dir="rtl">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>DroidPilot AI</title>
-  <meta name="robots" content="noindex" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%2322D3EE' d='M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71L12 2z'/%3E%3C/svg%3E" />
-  <link rel="stylesheet" href="/styles.css" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Aiminos — عقل هاتفك</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%237C5CFF'/%3E%3Cstop offset='1' stop-color='%2322D3EE'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Ctext x='16' y='22' font-size='16' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'%3EA%3C/text%3E%3C/svg%3E">
 </head>
 <body>
-  <header>
-    <div class="brand"><span class="logo">▲</span> DroidPilot AI</div>
-    <div id="deviceChip" class="chip-device">○ No device</div>
-  </header>
 
-  <main class="grid">
-    <!-- Pairing -->
-    <section class="card" id="pairCard">
-      <h3>Device Pairing</h3>
-      <p class="hint">In the app press <b>Connect</b>, then enter the 6-digit PIN here.</p>
-      <div class="row">
-        <select id="deviceSelect"><option value="">No pending devices…</option></select>
-        <input id="pinInput" inputmode="numeric" maxlength="6" placeholder="PIN" />
-        <button id="btnPair" class="primary">Pair</button>
+<header class="top">
+  <div class="brand">
+    <span class="logo">A</span>
+    <div><b>Aiminos</b><small>عقل هاتفك</small></div>
+  </div>
+  <nav class="tabs" id="tabs">
+    <button data-tab="chat" class="on">💬 الدردشة</button>
+    <button data-tab="team">🤝 الفريق</button>
+    <button data-tab="memory">🧠 الذاكرة</button>
+    <button data-tab="devices">📱 الأجهزة</button>
+    <button data-tab="settings">⚙️</button>
+    <button data-tab="logs">📋</button>
+  </nav>
+  <div class="conn"><span class="dot" id="connDot"></span><span id="connText">جارٍ الاتصال…</span></div>
+</header>
+
+<main>
+
+  <!-- ============================ CHAT ============================ -->
+  <section id="tab-chat" class="tab on">
+    <div class="chatbar">
+      <span class="chip" id="chatDevice">لا جهاز</span>
+      <select id="agentSel" title="الوكيل"></select>
+      <select id="modelSel" title="النموذج"></select>
+    </div>
+    <div class="log" id="chatLog">
+      <div class="hello">
+        <div class="hello-logo">A</div>
+        <h1>مرحبًا، أنا <b>Aiminos</b></h1>
+        <p>اكتب أمرًا… أو اضغط 🎤 وتحدث. أراك وأتصرف في هاتفك.</p>
       </div>
-      <div id="pairMsg" class="hint"></div>
-    </section>
+    </div>
+    <div class="composer">
+      <button class="ghost" id="btnStop" title="إيقاف المهمة" hidden>⏹</button>
+      <button class="ghost" id="btnResume" title="متابعة آخر مهمة" hidden>▶</button>
+      <button class="ghost" id="btnMic" title="تحدث">🎤</button>
+      <textarea id="msg" rows="1" placeholder="اكتب أمرًا…"></textarea>
+      <button class="primary" id="btnSend">➤</button>
+    </div>
+    <div class="micstate" id="micState" hidden>🎙️ أستمع إليك…</div>
+  </section>
 
-    <!-- Model selector -->
-    <section class="card" id="modelCard">
-      <h3>AI Model</h3>
-      <select id="modelSelect"></select>
-      <div id="modelMeta" class="meta">
-        <div>Provider: <b>—</b></div>
-        <div class="caps">
-          <span class="no">✗ Reasoning</span>
-          <span class="no">✗ Tool Calling</span>
-          <span class="no">✗ Vision</span>
-        </div>
-        <div>Status: <span class="dot red"></span> —</div>
+  <!-- ============================ TEAM ============================ -->
+  <section id="tab-team" class="tab">
+    <h2 class="pagetitle">فريق الوكلاء <small>يوجَّه تلقائيًا حسب أمرك — أو اختر يدويًا من الدردشة</small></h2>
+    <div class="cards" id="teamCards"></div>
+  </section>
+
+  <!-- ============================ MEMORY ============================ -->
+  <section id="tab-memory" class="tab">
+    <h2 class="pagetitle">ذاكرة Aiminos <small>حقائق دائمة · ملخص الجلسات · آخر الحوارات</small></h2>
+    <div class="memgrid">
+      <div class="card">
+        <h3>🔐 حقائق دائمة</h3>
+        <form id="memAdd" class="memadd">
+          <input id="memKey" placeholder="الاسم (مثال: حسابي)" maxlength="40">
+          <input id="memVal" placeholder="القيمة (مثال: رابط قناتي …)" maxlength="200">
+          <button class="primary">حفظ</button>
+        </form>
+        <ul class="facts" id="factList"></ul>
       </div>
-    </section>
+      <div class="card">
+        <h3>📜 ملخص الجلسات</h3>
+        <p class="summary" id="memSummary">—</p>
+        <h3>🕑 آخر الحوارات</h3>
+        <ul class="hist" id="memHist"></ul>
+      </div>
+    </div>
+  </section>
 
-    <!-- Chat -->
-    <section class="card chat" id="chatCard">
-      <h3>Chat</h3>
-      <div id="messages" class="messages"><div class="empty">Pair a device, pick a model, then send a command like: <b>افتح TikTok وانتقل للفيديو التالي</b></div></div>
-      <form id="chatForm">
-        <input id="chatInput" placeholder="e.g. Open TikTok and go to the next video" autocomplete="off" />
-        <button class="primary" id="btnSend" type="submit">Send</button>
-      </form>
-    </section>
+  <!-- ============================ DEVICES ============================ -->
+  <section id="tab-devices" class="tab">
+    <h2 class="pagetitle">الأجهزة <small>اقتران جديد أو إدارة الأجهزة المتصلة</small></h2>
+    <div class="card paircard">
+      <h3>🔗 اقتران هاتف جديد</h3>
+      <ol class="stepsmini">
+        <li>في التطبيق: اضغط <b>Connect</b> بعد وضع رابط الخادم</li>
+        <li>سيظهر لك رمز من 6 أرقام — أدخله هنا</li>
+      </ol>
+      <div class="pinrow">
+        <input id="pin" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="one-time-code">
+        <button class="primary" id="btnPair">اقتران</button>
+      </div>
+      <p class="hint" id="pairHint"></p>
+    </div>
+    <div class="cards" id="deviceCards"></div>
+  </section>
 
-    <!-- Live log -->
-    <section class="card log" id="logCard">
-      <h3>LIVE LOG</h3>
-      <div id="liveLog" class="livelog"></div>
-    </section>
-  </main>
+  <!-- ============================ SETTINGS ============================ -->
+  <section id="tab-settings" class="tab">
+    <h2 class="pagetitle">الإعدادات <small>المحرك · الأدوات · ADB</small></h2>
+    <div class="card">
+      <h3>⚡ محرك Aiminos</h3>
+      <div class="cards models" id="modelCards"></div>
+    </div>
+    <div class="card">
+      <h3>🛠️ وضع ADB (اختياري — تحكم أعمق)</h3>
+      <p class="hint">يفكّ ADB قيود الإتاحة: نقرات وإدخال نص يعملان حتى داخل التطبيقات العنيدة.</p>
+      <ol class="stepsmini">
+        <li>وصّل الهاتف بحاسوب مرة واحدة وفعّل <b>خيارات المطور ← تصحيح USB</b></li>
+        <li>من الحاسوب: <code>adb tcpip 5555</code></li>
+        <li>افصل الكابل — ثم في التطبيق: <b>الإعدادات ← ADB ← تشغيل</b></li>
+        <li>وافق على نافذة التفويض التي ستظهر على الهاتف</li>
+      </ol>
+      <p class="hint">بدون ADB كل شيء يعمل عبر خدمة الإتاحة — ADB طبقة إضافية فقط.</p>
+    </div>
+    <div class="card">
+      <h3>ℹ️ حول</h3>
+      <p class="hint">Aiminos v2 · عقل مدبّر + فريق وكلاء + ذاكرة ثلاثية · مجاني 100% عبر Cloudflare</p>
+    </div>
+  </section>
 
-  <footer>DroidPilot AI — Android Agent · Cloudflare Worker · Workers AI <span id="health"></span></footer>
-  <script src="/app.js"></script>
+  <!-- ============================ LOGS ============================ -->
+  <section id="tab-logs" class="tab">
+    <h2 class="pagetitle">سجل النظام <small>مباشر</small></h2>
+    <pre class="logview" id="logView">…</pre>
+  </section>
+
+</main>
+
+<script src="app.js"></script>
 </body>
 </html>

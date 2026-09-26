@@ -2,7 +2,9 @@ import type { Env } from "./env";
 import { json, readJson, ipOf } from "./util";
 import { publicModels } from "./models";
 import { registerDevice, confirmPairing, verifyDevice, touchDevice, listDevices, heartbeat, publicDevice } from "./devices";
-import { startTurn, pollCommand, applyDeviceResult, getTurnResponse } from "./agent";
+import { startTurn, pollCommand, applyDeviceResult, getTurnResponse, stopDeviceTurn } from "./agent";
+import { publicAgents } from "./agents";
+import { memorySnapshot, saveFact, forgetFact, listFacts } from "./memory";
 import { rateLimit } from "./ratelimit";
 import { audit, getLogs } from "./audit";
 
@@ -31,10 +33,13 @@ async function handleApi(req: Request, env: Env, ctx: ExecutionContext, path: st
 
   // ---------------------------------------------------------- public reads
   if (method === "GET" && path === "/api/health") {
-    return json({ ok: true, service: "droidpilot-ai", time: Date.now() });
+    return json({ ok: true, service: "aiminos", time: Date.now() });
   }
   if (method === "GET" && path === "/api/models") {
     return json({ ok: true, models: publicModels() });
+  }
+  if (method === "GET" && path === "/api/agents") {
+    return json({ ok: true, agents: publicAgents() });
   }
   if (method === "GET" && path === "/api/devices") {
     return listDevices(env);
@@ -96,7 +101,42 @@ async function handleApi(req: Request, env: Env, ctx: ExecutionContext, path: st
     const rec = JSON.parse(raw);
     if (rec.status !== "active") return json({ ok: false, error: "DEVICE_NOT_PAIRED" }, 409);
 
-    return startTurn(env, ctx, deviceId, message, body?.model_id ?? null);
+    return startTurn(env, ctx, deviceId, message, body?.model_id ?? null, body?.agent_id ?? null, body?.source ?? null);
+  }
+
+  // ------------------------------------------------- aiminos: stop / memory
+  if (method === "POST" && path === "/api/turn/stop") {
+    const body = await readJson(req);
+    const deviceId = String(body?.device_id ?? "");
+    if (!deviceId) return json({ ok: false, error: "INVALID_ARGUMENT" }, 400);
+    await audit(env, "stop_requested", { device: deviceId, source: String(body?.source ?? "web") });
+    return stopDeviceTurn(env, deviceId);
+  }
+
+  if (method === "GET" && path.startsWith("/api/memory/")) {
+    const deviceId = decodeURIComponent(path.slice("/api/memory/".length));
+    if (!deviceId) return json({ ok: false, error: "INVALID_ARGUMENT" }, 400);
+    const snap = await memorySnapshot(env, deviceId);
+    return json(snap);
+  }
+
+  if (method === "POST" && path === "/api/memory/add") {
+    const body = await readJson(req);
+    const deviceId = String(body?.device_id ?? "");
+    const k = String(body?.key ?? "").trim();
+    const v = String(body?.value ?? "").trim();
+    if (!deviceId || !k || !v) return json({ ok: false, error: "INVALID_ARGUMENT" }, 400);
+    await saveFact(env, deviceId, k, v);
+    return json({ ok: true, facts: await listFacts(env, deviceId) });
+  }
+
+  if (method === "POST" && path === "/api/memory/delete") {
+    const body = await readJson(req);
+    const deviceId = String(body?.device_id ?? "");
+    const k = String(body?.key ?? "").trim();
+    if (!deviceId || !k) return json({ ok: false, error: "INVALID_ARGUMENT" }, 400);
+    const gone = await forgetFact(env, deviceId, k);
+    return json({ ok: true, forgotten: gone, facts: await listFacts(env, deviceId) });
   }
 
   // ------------------------------------------------------------- turns

@@ -22,6 +22,7 @@ import urllib.request
 
 BASE = (sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8787").rstrip("/")
 PROMPT = sys.argv[2] if len(sys.argv) > 2 else "افتح TikTok وانتقل للفيديو التالي"
+MODEL = (sys.argv[3] if len(sys.argv) > 3 else None)  # optional model_id override
 
 
 def req(method, path, body=None, headers=None, timeout=45):
@@ -90,7 +91,7 @@ def main():
     if not r or not r.get("ok"):
         sys.exit(1)
 
-    r = req("POST", "/api/chat", {"message": PROMPT, "device_id": dev, "model_id": None})
+    r = req("POST", "/api/chat", {"message": PROMPT, "device_id": dev, "model_id": MODEL})
     if not r or not r.get("ok"):
         print("chat FAILED:", r)
         sys.exit(1)

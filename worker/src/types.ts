@@ -62,7 +62,7 @@ export interface DeviceResult {
   error_code?: string | null;
 }
 
-export type TurnState = "thinking" | "awaiting_device" | "done" | "error";
+export type TurnState = "thinking" | "awaiting_device" | "done" | "error" | "stopped";
 
 export interface TurnStep {
   ts: number;
@@ -79,6 +79,8 @@ export interface Turn {
   id: string;
   device_id: string;
   model_id: string;
+  agent_id?: string;
+  source?: string; // "web" | "voice" | "api"
   state: TurnState;
   messages: ChatMessage[];
   steps: TurnStep[];

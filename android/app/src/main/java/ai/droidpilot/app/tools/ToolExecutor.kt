@@ -241,8 +241,11 @@ class ToolExecutor(private val context: Context) {
             // Final fallback: gesture tap at the element's center.
             val b = s.boundsOf(node)
             val tapped = s.gestureTap(b.exactCenterX(), b.exactCenterY())
-            return if (tapped) ok(id, JSONObject().put("tapped", "gesture").put("element_id", elementId))
-            else fail(id, "TAP_FAILED", elementId)
+            return when {
+                tapped -> ok(id, JSONObject().put("tapped", "gesture").put("element_id", elementId))
+                adb.isAvailable() -> adbFallback(id, "input tap ${b.exactCenterX().toInt()} ${b.exactCenterY().toInt()}")
+                else -> fail(id, "TAP_FAILED", elementId)
+            }
         } catch (e: Exception) {
             return fail(id, "ELEMENT_NOT_FOUND", "node went stale: ${e.message}")
         }
@@ -270,8 +273,22 @@ class ToolExecutor(private val context: Context) {
         }
         return if (focus.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, bundle)) {
             ok(id, JSONObject().put("typed", text.take(50)))
+        } else if (adb.isAvailable() && text.all { it.code in 32..126 }) {
+            // ADB input text only supports ASCII — spaces must be %s.
+            adbFallback(id, "input text " + text.replace(" ", "%s").replace("\"", "\\\""))
         } else {
             fail(id, "TYPE_FAILED")
+        }
+    }
+
+    /** Deep-control fallback: run the command through the ADB bridge (opt-in). */
+    private fun adbFallback(id: String, command: String): JSONObject {
+        return try {
+            adb.exec(command)
+            ok(id, JSONObject().put("via", "adb").put("cmd", command.take(60)))
+        } catch (t: Throwable) {
+            LogSystem.log("adb", "fallback failed: ${t.message}")
+            fail(id, "ADB_FALLBACK_FAILED", t.message?.take(120))
         }
     }
 

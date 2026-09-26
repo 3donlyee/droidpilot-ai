@@ -56,7 +56,7 @@ class ApiClient(private val prefs: SecurePrefs) {
     private fun auth(builder: Request.Builder) {
         builder.addHeader("x-device-id", prefs.deviceId ?: "")
         builder.addHeader("x-device-secret", prefs.deviceSecret ?: "")
-        builder.addHeader("user-agent", "DroidPilot-Android/0.1")
+        builder.addHeader("user-agent", "Aiminos-Android/0.2")
     }
 
     private fun execute(builder: Request.Builder, long: Boolean): Pair<Int, JSONObject?> {
@@ -78,7 +78,7 @@ class ApiClient(private val prefs: SecurePrefs) {
             .put("device_name", Build.MODEL ?: "unknown")
             .put("model", "${Build.MANUFACTURER} ${Build.MODEL}")
             .put("android_version", Build.VERSION.RELEASE ?: "")
-            .put("app_version", "0.1.0")
+            .put("app_version", "0.2.0")
         val req = Request.Builder()
             .url(requireUrl() + "/api/device/register")
             .post(body.toString().toRequestBody(json))
@@ -120,6 +120,41 @@ class ApiClient(private val prefs: SecurePrefs) {
             .url("${requireUrl()}/api/device/heartbeat")
             .post(info.toString().toRequestBody(json))
         auth(req)
+        val (code, resp) = execute(req, long = false)
+        return code == 200 && resp?.optBoolean("ok") == true
+    }
+
+    // ------------------------------------------------- Aiminos v2: user-side
+    // Voice panel & web chat both act as the USER side: send a chat message,
+    // follow the turn, or stop the running task. (No device auth needed.)
+
+    /** Send a chat message as the user. Returns the API response (turn_id…). */
+    fun chat(message: String, source: String = "voice", agentId: String? = null): JSONObject? {
+        val body = JSONObject()
+            .put("device_id", prefs.deviceId ?: "")
+            .put("message", message)
+            .put("source", source)
+        if (!agentId.isNullOrBlank()) body.put("agent_id", agentId)
+        val req = Request.Builder()
+            .url(requireUrl() + "/api/chat")
+            .post(body.toString().toRequestBody(json))
+        val (code, resp) = execute(req, long = false)
+        return if (code == 200) resp else resp
+    }
+
+    /** Fetch a turn's state/steps/final response. */
+    fun getTurn(turnId: String): JSONObject? {
+        val req = Request.Builder().url("${requireUrl()}/api/turn/$turnId")
+        val (code, resp) = execute(req, long = false)
+        return if (code == 200) resp else null
+    }
+
+    /** Stop the device's currently running task. */
+    fun stopTurn(source: String = "voice"): Boolean {
+        val body = JSONObject().put("device_id", prefs.deviceId ?: "").put("source", source)
+        val req = Request.Builder()
+            .url("${requireUrl()}/api/turn/stop")
+            .post(body.toString().toRequestBody(json))
         val (code, resp) = execute(req, long = false)
         return code == 200 && resp?.optBoolean("ok") == true
     }

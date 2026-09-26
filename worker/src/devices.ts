@@ -24,10 +24,10 @@ export async function registerDevice(env: Env, req: Request): Promise<Response> 
     return json({ ok: false, error: "SERVER_MISCONFIGURED", hint: "DEVICE_AUTH_SECRET secret is not set" }, 500);
   }
 
-  let deviceId = `DROID-${randomId(4)}`;
+  let deviceId = `AIM-${randomId(4)}`;
   // Ensure uniqueness (retry is practically never needed).
   if (await env.KV_DEVICES.get(`device:${deviceId}`)) {
-    deviceId = `DROID-${randomId(4)}`;
+    deviceId = `AIM-${randomId(4)}`;
   }
 
   const pairingCode = randomDigits(6);
@@ -56,7 +56,7 @@ export async function registerDevice(env: Env, req: Request): Promise<Response> 
     pairing_code: pairingCode,
     device_secret: deviceSecret,
     poll_wait_seconds: 20,
-    message: "Enter the PIN in the DroidPilot Web UI to complete pairing",
+    message: "أدخل الرمز في موقع Aiminos لإكمال الاقتران",
   });
 }
 

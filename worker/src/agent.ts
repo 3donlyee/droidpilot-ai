@@ -1,13 +1,15 @@
 import type { Env } from "./env";
 import type { Turn, Command, DeviceResult } from "./types";
 import { json, randomId, now, safeJsonParse } from "./util";
-import { TOOL_SCHEMAS } from "./tools";
 import { getProvider } from "./ai/provider";
 import { getModel, defaultModel } from "./models";
 import { audit } from "./audit";
+import { getAgent, pickAgent, toolsForAgent, systemPrompt as agentSystemPrompt, AgentEntry } from "./agents";
+import * as memory from "./memory";
 
 const DEVICE_TIMEOUT_MS = 45_000;   // device must return a result within 45s of a tool call
 const AI_TIMEOUT_MS = 90_000;       // safety net for stuck "thinking" turns
+const STOP_MSG = "⏹ أوقفتُ المهمة بناءً على طلبك. اضغط «متابعة» أو أرسل رسالة جديدة وقتما تشاء.";
 
 function maxCalls(env: Env): number {
   const v = parseInt(env.MAX_TOOL_CALLS_PER_TURN ?? "20", 10);
@@ -32,21 +34,7 @@ async function clearDeviceTurn(env: Env, deviceId: string): Promise<void> {
 }
 
 function systemPrompt(deviceInfo?: { model?: string; android_version?: string }): string {
-  const dev = deviceInfo?.model ? ` Target device: ${deviceInfo.model} (Android ${deviceInfo.android_version ?? "?"}).` : "";
-  return [
-    "You are DroidPilot AI, an agent that controls the user's Android phone through tools executed on the device.",
-    dev,
-    "",
-    "Rules:",
-    "1. Issue ONE tool call per step, then wait for its result before deciding the next action.",
-    "2. Priority: accessibility tools first. Use take_screenshot ONLY as a last resort.",
-    "3. After open_app, verify with get_current_package.",
-    "4. Before tapping, call get_screen_nodes and pick the correct element_id.",
-    "5. If a tool fails (e.g. ELEMENT_NOT_FOUND), re-observe with get_screen_nodes and try a different strategy. Never repeat the exact same failing call more than twice.",
-    "6. Never attempt destructive or unsafe actions. run_shell is policy-restricted; blocked commands are rejected by the device.",
-    "7. The user may write in Arabic or English — always reply in the user's language, briefly and clearly.",
-    "8. When the goal is achieved, reply with a short confirmation and stop.",
-  ].join("\n");
+  return agentSystemPrompt(getAgent("general"), "", deviceInfo);
 }
 
 // -------------------------------------------------------------- start turn
@@ -56,7 +44,9 @@ export async function startTurn(
   ctx: ExecutionContext,
   deviceId: string,
   message: string,
-  modelId?: string | null
+  modelId?: string | null,
+  agentId?: string | null,
+  source?: string | null
 ): Promise<Response> {
   const model = (modelId && getModel(modelId)) || defaultModel();
   if (!model.supportsTools) {
@@ -83,27 +73,40 @@ export async function startTurn(
     deviceInfo = raw ? JSON.parse(raw) : undefined;
   } catch {}
 
+  // === Aiminos mind: pick the specialist + load the three-tier memory ===
+  const agent = pickAgent(message, agentId ?? null);
+  const [memBlock, hist] = await Promise.all([
+    memory.memoryBlock(env, deviceId),
+    memory.loadHistory(env, deviceId),
+  ]);
+
   const turnId = `turn_${randomId(8).toLowerCase()}`;
   const turn: Turn = {
     id: turnId,
     device_id: deviceId,
     model_id: model.id,
+    agent_id: agent.id,
+    source: source ?? "web",
     state: "thinking",
     messages: [
-      { role: "system", content: systemPrompt(deviceInfo) },
+      { role: "system", content: agentSystemPrompt(agent, memBlock, deviceInfo) },
+      ...hist.slice(-6).map((h) => ({ role: h.role, content: h.text }) as any),
       { role: "user", content: message.slice(0, 4000) },
     ],
-    steps: [{ ts: now(), type: "user", text: message.slice(0, 4000) }],
+    steps: [
+      { ts: now(), type: "user", text: message.slice(0, 4000) },
+      { ts: now(), type: "info", text: `${agent.emoji} الوكيل: ${agent.name}` },
+    ],
     tool_calls_used: 0,
     created_at: now(),
     updated_at: now(),
   };
   await saveTurn(env, turn);
   await env.KV_DEVICES.put(`turn:${deviceId}`, turnId, { expirationTtl: 3600 });
-  await audit(env, "chat_started", { turn: turnId, device: deviceId, model: model.id });
+  await audit(env, "chat_started", { turn: turnId, device: deviceId, model: model.id, agent: agent.id, source: turn.source });
 
-  ctx.waitUntil(agentStep(env, turnId));
-  return json({ ok: true, turn_id: turnId, device_id: deviceId, model_id: model.id });
+  ctx.waitUntil(agentStep(env, ctx, turnId));
+  return json({ ok: true, turn_id: turnId, device_id: deviceId, model_id: model.id, agent_id: agent.id });
 }
 
 // ------------------------------------------------------------ agent engine
@@ -113,18 +116,27 @@ export async function startTurn(
  *   AI → tool_call? → queue for device → (device result re-triggers us)
  *      → final text? → turn done.
  */
-export async function agentStep(env: Env, turnId: string): Promise<void> {
+export async function agentStep(env: Env, ctx: ExecutionContext, turnId: string): Promise<void> {
   const turn = await loadTurn(env, turnId);
   if (!turn || turn.state !== "thinking") return;
 
-  if (turn.tool_calls_used >= maxCalls(env)) {
-    await finishTurn(env, turn, "Stopped: reached MAX_TOOL_CALLS_PER_TURN.");
+  const agent: AgentEntry = getAgent(turn.agent_id);
+
+  // Stop/Resume control channel: check before every AI step.
+  if (await env.KV_DEVICES.get(`abort:${turn.id}`)) {
+    await finishTurn(env, ctx, turn, STOP_MSG, "stopped");
+    return;
+  }
+
+  const budget = Math.min(maxCalls(env), agent.max_steps);
+  if (turn.tool_calls_used >= budget) {
+    await finishTurn(env, ctx, turn, `توقفت عند حد الخطوات لهذا الوكيل (${budget}). اطلب مني المتابعة لأكمل.`, "stopped");
     return;
   }
 
   try {
     const provider = getProvider(env, turn.model_id);
-    const result = await provider.chat(turn.model_id, turn.messages, TOOL_SCHEMAS);
+    const result = await provider.chat(turn.model_id, turn.messages, toolsForAgent(agent));
 
     if (result.toolCalls.length > 0) {
       const tc = result.toolCalls[0]; // one command at a time
@@ -133,6 +145,23 @@ export async function agentStep(env: Env, turnId: string): Promise<void> {
       if (typeof args !== "object") args = { value: args };
 
       if (result.text) turn.steps.push({ ts: now(), type: "ai", text: result.text });
+
+      // --- Server-side memory tools: never dispatched to the device ---
+      if (tc.name === "memory_save" || tc.name === "memory_list" || tc.name === "memory_forget") {
+        const out = await memory.handleMemoryTool(env, turn.device_id, tc.name, args);
+        turn.messages.push({
+          role: "assistant",
+          content: result.text ?? null,
+          tool_calls: [{ id: cmdId, name: tc.name, args }],
+        });
+        turn.messages.push({ role: "tool", tool_call_id: cmdId, content: JSON.stringify({ tool: tc.name, success: out.ok, ...out.result }) });
+        turn.steps.push({ ts: now(), type: "tool_call", tool: tc.name, cmd_id: cmdId, args });
+        turn.steps.push({ ts: now(), type: "tool_result", tool: tc.name, cmd_id: cmdId, ok: out.ok, summary: "memory" });
+        turn.tool_calls_used += 1;
+        await saveTurn(env, turn);
+        ctx.waitUntil(agentStep(env, ctx, turnId));
+        return;
+      }
 
       const cmd: Command = {
         type: "command",
@@ -158,7 +187,7 @@ export async function agentStep(env: Env, turnId: string): Promise<void> {
       // (audit for tool_call removed — tool_result below logs the same info + outcome;
       //  halves audit writes to respect the free-tier KV daily quota)
     } else {
-      await finishTurn(env, turn, result.text ?? "(empty response)");
+      await finishTurn(env, ctx, turn, result.text ?? "(empty response)");
     }
   } catch (e: any) {
     turn.steps.push({ ts: now(), type: "error", text: `AI_ERROR: ${String(e?.message ?? e).slice(0, 800)}` });
@@ -170,15 +199,24 @@ export async function agentStep(env: Env, turnId: string): Promise<void> {
   }
 }
 
-async function finishTurn(env: Env, turn: Turn, text: string): Promise<void> {
+async function finishTurn(
+  env: Env,
+  ctx: { waitUntil(p: Promise<any>): void },
+  turn: Turn,
+  text: string,
+  state: "done" | "stopped" = "done"
+): Promise<void> {
   turn.steps.push({ ts: now(), type: "final", text });
   turn.messages.push({ role: "assistant", content: text });
-  turn.state = "done";
+  turn.state = state;
   turn.final_response = text;
   turn.pending_command = null;
   await saveTurn(env, turn);
   await clearDeviceTurn(env, turn.device_id);
-  await audit(env, "turn_done", { turn: turn.id, device: turn.device_id });
+  await audit(env, state === "stopped" ? "turn_stopped" : "turn_done", { turn: turn.id, device: turn.device_id });
+  // Memory protocol T2: remember the exchange (and occasionally refresh the summary).
+  const userText = (turn.steps.find((s) => s.type === "user")?.text ?? "").slice(0, 600);
+  await memory.rememberTurn(env, ctx, turn.device_id, userText, text.slice(0, 600));
 }
 
 // ------------------------------------------------------------ device result
@@ -221,7 +259,7 @@ export async function applyDeviceResult(
   await audit(env, "tool_result", { turn: turnId, device: rec.device_id, tool, ok: !!result.success });
 
   // Continue the loop: AI sees the result and either calls the next tool or answers.
-  ctx.waitUntil(agentStep(env, turnId));
+  ctx.waitUntil(agentStep(env, ctx, turnId));
   return json({ ok: true, next: "agent_step" });
 }
 
@@ -259,12 +297,27 @@ export async function pollCommand(
   }
 }
 
-// ----------------------------------------------------------------- sweep
+// ------------------------------------------------------------ stop / resume
 
 /**
- * Lazy expiry: checked on turn reads and before starting new turns.
- * (No cron/alarms needed for the MVP.)
+ * Stop the device's active turn (Stop button in Web UI / voice overlay).
+ * Sets an abort flag the agent loop checks before every AI step, and
+ * immediately cancels any pending device command.
  */
+export async function stopDeviceTurn(env: Env, deviceId: string): Promise<Response> {
+  const turnId = await env.KV_DEVICES.get(`turn:${deviceId}`);
+  if (!turnId) return json({ ok: false, error: "NO_ACTIVE_TURN" }, 404);
+  await env.KV_DEVICES.put(`abort:${turnId}`, "1", { expirationTtl: 600 });
+
+  const turn = await loadTurn(env, turnId);
+  if (turn && (turn.state === "thinking" || turn.state === "awaiting_device")) {
+    await env.KV_DEVICES.delete(`pendingcmd:${deviceId}`);
+    await finishTurn(env, { waitUntil: () => {} } as any, turn, STOP_MSG, "stopped");
+  }
+  return json({ ok: true, stopped: turnId });
+}
+
+// ----------------------------------------------------------------- sweep
 export async function expireIfNeeded(env: Env, turn: Turn): Promise<boolean> {
   let expired: string | null = null;
 
@@ -294,6 +347,7 @@ export async function getTurnResponse(env: Env, turnId: string): Promise<Respons
     id: turn.id,
     state: turn.state,
     model_id: turn.model_id,
+    agent_id: turn.agent_id ?? "general",
     steps: turn.steps,
     tool_calls_used: turn.tool_calls_used,
     final_response: turn.final_response ?? null,

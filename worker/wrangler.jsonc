@@ -9,7 +9,7 @@
 //   wrangler kv namespace create KV_DEVICES   (…and the other three)
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "droidpilot-ai",
+  "name": "aiminos",
   "main": "src/index.ts",
   "compatibility_date": "2025-08-01",
 
@@ -25,10 +25,10 @@
   },
 
   "kv_namespaces": [
-    { "binding": "KV_DEVICES", "id": "aeccd1e48588423e96bed09ba89b2cb8" },
-    { "binding": "KV_TURNS",   "id": "7b958ae3aab34ae6aba4a783a1f2624b" },
-    { "binding": "KV_RATE",    "id": "2ab59f32624a4c0a9bae501b36aad5c6" },
-    { "binding": "KV_LOGS",    "id": "ebe9df399ca04d37a7e707208af08c29" }
+    { "binding": "KV_DEVICES", "id": "207ce78675a24f3cbdaafd8ffd488469" },
+    { "binding": "KV_TURNS",   "id": "8e1cafba93e0462dbcdc53102fe645cb" },
+    { "binding": "KV_RATE",    "id": "c0aea6e5f61a44398463c4b443151f77" },
+    { "binding": "KV_LOGS",    "id": "21b56f97b0e8473e8b04b611302281fa" }
   ],
 
   "vars": {

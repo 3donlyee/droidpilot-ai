@@ -12,6 +12,7 @@ import android.os.Looper
 import android.provider.Settings
 import android.view.accessibility.AccessibilityManager
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -74,7 +75,35 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnStart).setOnClickListener { startConnection() }
         findViewById<Button>(R.id.btnStop).setOnClickListener { stopConnection() }
 
-        requestNotificationPermission()
+        addAdbRow()
+        requestPermissions()
+    }
+
+    /** ADB deep-control toggle (opt-in). See Web UI → الإعدادات for setup steps. */
+    private fun addAdbRow() {
+        try {
+            val content = findViewById<android.view.ViewGroup>(android.R.id.content)
+            val scroll = content.getChildAt(0) as? android.widget.ScrollView ?: return
+            val root = scroll.getChildAt(0) as? LinearLayout ?: return
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(8, 8, 8, 8)
+                gravity = android.view.Gravity.CENTER_VERTICAL
+            }
+            val cb = CheckBox(this).apply {
+                text = "وضع ADB — تحكم أعمق (يتطلب إعدادًا واحدًا من الحاسوب)"
+                textSize = 13f
+                isChecked = prefs.adbEnabled
+                setOnCheckedChangeListener { _, v ->
+                    prefs.adbEnabled = v
+                    Toast.makeText(this@MainActivity, if (v) "ADB mode ON" else "ADB mode OFF", Toast.LENGTH_SHORT).show()
+                }
+            }
+            row.addView(cb)
+            root.addView(row)
+        } catch (_: Throwable) {
+            // cosmetic only — never break app startup
+        }
     }
 
     override fun onResume() {
@@ -178,13 +207,16 @@ class MainActivity : AppCompatActivity() {
         tvLog.text = lines.joinToString("\n")
     }
 
-    private fun requestNotificationPermission() {
+    private fun requestPermissions() {
+        val needed = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= 33 &&
             ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
             != PackageManager.PERMISSION_GRANTED
-        ) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
-        }
+        ) needed.add(Manifest.permission.POST_NOTIFICATIONS)
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED
+        ) needed.add(Manifest.permission.RECORD_AUDIO)
+        if (needed.isNotEmpty()) ActivityCompat.requestPermissions(this, needed.toTypedArray(), 1)
     }
 
     private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()

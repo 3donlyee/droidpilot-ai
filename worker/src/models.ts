@@ -11,8 +11,10 @@
  *                             Requires OPENAI_API_KEY secret; OPENAI_BASE_URL is
  *                             a public endpoint (set as a plain var).
  *
- * CURRENT ACTIVE: openai/gpt-4o via OpenRouter. Cloudflare models are kept
- * disabled below — flip "enabled" to use them again without any other change.
+ * CURRENT ACTIVE (100% FREE): Cloudflare Workers AI models only — no API keys,
+ * no OpenRouter, no paid plans. Workers AI free tier = daily Neuron allocation.
+ * Paid/OpenRouter entries are kept disabled for one-flag re-enable later.
+ * Aiminos branding: Core (smart), Fast (speed), Vision (screenshots).
  */
 export interface ModelEntry {
   id: string;
@@ -27,53 +29,55 @@ export interface ModelEntry {
 
 export const MODELS: ModelEntry[] = [
   {
+    // PAID via OpenRouter — user opted out of paid models. One-flag re-enable.
     id: "openai/gpt-4o",
-    displayName: "GPT-4o (OpenRouter)",
+    displayName: "GPT-4o (OpenRouter) [مدفوع]",
     provider: "openai-compat",
     supportsTools: true,
     supportsVision: true,
     reasoning: false,
-    enabled: true,
-    default: true,
+    enabled: false,
+    default: false,
   },
   {
-    // Regional fallback: some OpenAI models are region-blocked depending on the
-    // Cloudflare colo that egresses the request. Llama on OpenRouter is not.
+    // OpenRouter fallback for gpt-4o — disabled together with it (free tier of
+    // OpenRouter is rate-limited to ~50 req/day; Workers AI is more generous).
     id: "meta-llama/llama-3.3-70b-instruct",
     displayName: "Llama 3.3 70B (OpenRouter)",
     provider: "openai-compat",
     supportsTools: true,
     supportsVision: false,
     reasoning: false,
-    enabled: true,
+    enabled: false,
   },
-  // --- Cloudflare Workers AI (disabled — switched to OpenRouter) ---
+  // --- Aiminos engines (100% FREE — Cloudflare Workers AI, no keys) ---
   {
     id: "@cf/openai/gpt-oss-20b",
-    displayName: "GPT-OSS 20B",
+    displayName: "Aiminos Core",
     provider: "cloudflare",
     supportsTools: true,
     supportsVision: false,
     reasoning: true,
-    enabled: false,
+    enabled: true,
+    default: true,
   },
   {
     id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
-    displayName: "Llama 3.3 70B (fast)",
+    displayName: "Aiminos Fast",
     provider: "cloudflare",
     supportsTools: true,
     supportsVision: false,
     reasoning: false,
-    enabled: false,
+    enabled: true,
   },
   {
     id: "@cf/meta/llama-4-scout-17b-16e-instruct",
-    displayName: "Llama 4 Scout",
+    displayName: "Aiminos Vision",
     provider: "cloudflare",
     supportsTools: true,
     supportsVision: true,
     reasoning: false,
-    enabled: false,
+    enabled: true,
   },
 ];
 
