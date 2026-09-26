@@ -1,37 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Primary teal / cyan (Android Material3 style color tokens) -->
-    <color name="primary">#00897B</color>            <!-- teal 600 -->
-    <color name="primary_dark">#00564D</color>
-    <color name="primary_light">#4EBAAA</color>
-    <color name="primary_container">#B2DFDB</color>
-
-    <!-- Accent purple -->
-    <color name="accent">#7E57C2</color>            <!-- deep purple 400 -->
-    <color name="accent_dark">#4B2E83</color>
-    <color name="accent_container">#D1C4E9</color>
-
-    <!-- Backgrounds -->
-    <color name="background_dark">#0F1419</color>
-    <color name="background_light">#F7F8FA</color>
-    <color name="surface_dark">#1A1F25</color>
-    <color name="surface_light">#FFFFFF</color>
-
-    <!-- Text -->
-    <color name="text_primary_light">#1B1F22</color>
-    <color name="text_secondary_light">#5C6470</color>
-    <color name="text_primary_dark">#E8EAED</color>
-    <color name="text_secondary_dark">#9AA0A6</color>
-
-    <!-- Status -->
-    <color name="status_disconnected">#EF5350</color>
-    <color name="status_connecting">#FFA726</color>
-    <color name="status_connected">#66BB6A</color>
-
-    <!-- Misc -->
-    <color name="white">#FFFFFFFF</color>
-    <color name="black">#FF000000</color>
-    <color name="transparent">#00000000</color>
-    <color name="log_text">#F0F4F8</color>
-    <color name="log_background">#0E1116</color>
+    <color name="primary">#0E7490</color>
+    <color name="on_primary">#FFFFFF</color>
+    <color name="accent">#22D3EE</color>
+    <color name="background">#0B0F14</color>
+    <color name="surface">#151B23</color>
+    <color name="text_main">#E6EDF3</color>
+    <color name="text_dim">#8B98A5</color>
+    <color name="ok">#34D399</color>
+    <color name="err">#F87171</color>
 </resources>

@@ -1,188 +1,133 @@
 # Architecture
 
-## High-level flow
+## Components & flow
 
 ```
-USER
-  │  (chat message in Web UI)
-  ▼
-Cloudflare Worker  ────────────────  Cloudflare D1 (sessions, audit logs)
-  │  HTTPS  ↑↓
-  │  WSS    ↑↓  (persistent command channel)
-  ▼
-DroidPilot Android App
-  │  Foreground Service
-  │  ├── WorkerClient (HTTPS + WebSocket)
-  │  ├── Tool Executor
-  │  │     ├── AccessibilityTools   (read tree, tap element)
-  │  │     ├── GestureTools         (swipe, tap coords)
-  │  │     ├── AppTools             (open app, current package)
-  │  │     ├── ShellTools           (run_shell w/ policy)
-  │  │     └── ScreenshotTools      (on-demand capture)
-  │  ├── CommandValidator           (allowlist + safety check)
-  │  ├── AdbBridge (OPTIONAL)      (no root, local ADB over Wi-Fi)
-  │  └── DroidPilotAccessibilityService (Android Accessibility)
-  ▼
-TikTok / any target app
+┌──────────┐   HTTPS    ┌─────────────────────┐    env.AI    ┌────────────────┐
+│  Web UI  │──────────▶│  Cloudflare Worker   │────────────▶│ Workers AI      │
+│ (static) │◀──────────│  (this repo/worker)  │◀────────────│ gpt-oss-20b     │
+└──────────┘           │  · pairing/auth      │             └────────────────┘
+                       │  · chat API          │
+┌──────────┐   HTTPS   │  · agent loop        │
+│ Android  │──────────▶│  · command routing   │
+│ DroidPilot│◀──────────│  · rate limit/audit  │
+└──────────┘           └─────────────────────┘
+   │ Accessibility tree · gestures · intents · (optional) ADB
+   ▼
+ TikTok / any app → Result → back to AI
 ```
 
-## Why this design
-
-### 1. Accessibility-first (not vision-first)
-Reading the Accessibility tree is **O(1)** in cost and **O(n)** in tokens (n = nodes),
-whereas screenshots require base64 encoding + multimodal model tokens. For routine
-operations (tap a Like button, scroll feed, switch tab), the tree is enough.
-
-**Hierarchy of evidence** used by the agent:
-1. Accessibility tree (preferred)
-2. Android system APIs (package manager, activity manager)
-3. Gesture APIs (programmable taps/swipes via AccessibilityService.dispatchGesture)
-4. Screenshot + OCR (only when the tree is empty or AI explicitly requests it)
-
-### 2. Cloudflare Worker as the only public endpoint
-- The Android device **never** exposes a public port. It only makes outbound HTTPS/WSS
-  connections to the Worker.
-- The Worker is the AI orchestrator + auth gateway + rate limiter + audit logger.
-- Workers AI binding (`env.AI`) provides inference without per-request API keys.
-
-### 3. Tool calling (not free-text commands)
-The AI model emits structured tool calls (`{tool, arguments}`) which the Worker routes
-to the device. This is verifiable, sandboxable, and prevents prompt-injection-driven
-arbitrary shell execution.
-
-### 4. AIProvider abstraction
-```
-AIProvider (interface)
-  ├── CloudflareAIProvider   (uses env.AI — Workers AI binding)
-  ├── OpenAIProvider         (uses OPENAI_API_KEY secret — any OpenAI-compatible endpoint)
-  └── (future) GroqProvider, OllamaProvider, LocalProvider
-```
-Switching models = switching one entry in the Model Registry. No code changes elsewhere.
-
-### 5. Model Registry
-A single TypeScript module (`worker/src/models/registry.ts`) lists every model with
-its provider, capabilities (tools/vision), and enabled flag. Adding a model = adding
-one entry. The Web UI's Model Selector reads this registry dynamically.
-
-## Tool calling loop
+## Turn state machine
 
 ```
-User message
-  │
-  ▼
-[Worker] build prompt + tool schemas → call AIProvider
-  │
-  ▼
-[AI] returns:  text response  OR  N tool_calls
-  │
-  ├── if text:  stream back to user. DONE.
-  │
-  └── if tool_calls:  for each (up to MAX_TOOL_CALLS_PER_TURN=20)
-        │
-        ▼
-      [Worker] route command → Device via WSS
-        │
-        ▼
-      [Device] ToolExecutor runs tool → returns result
-        │
-        ▼
-      [Worker] append tool_result to conversation
-        │
-        ▼
-      [Worker] call AIProvider again with updated context
-        │
-        ▼
-      ...loop until AI emits final text or limit reached
+        POST /api/chat
+              │
+              ▼
+         ┌─────────┐   AI returns tool_call    ┌──────────────────┐
+         │thinking │ ────────────────────────▶ │ awaiting_device  │
+         └─────────┘                           └──────────────────┘
+              ▲  ▲        device POSTs result        │  (45 s timeout)
+              │  └───────────────────────────────────┘
+              │ AI returns text / max calls / error
+              ▼
+        done | error
 ```
 
-### Loop safety
-- `MAX_TOOL_CALLS_PER_TURN = 20` (configurable via env).
-- Hash-dedup of `get_screen_nodes` responses — if the tree hasn't changed, return cached.
-- No-op detection: if AI calls the same tool with the same args 3× in a row with the
-  same failing result, the Worker injects a system message asking AI to try a different
-  strategy or request user confirmation.
+- `POST /api/chat` creates the turn and runs the first AI step in `waitUntil`.
+- Each AI step: provider.chat() → if `tool_calls` → queue ONE command
+  (`pendingcmd:<device>` key) → device long-polls → executes → POSTs result →
+  the result handler appends the tool message and re-triggers the loop.
+- `MAX_TOOL_CALLS_PER_TURN` (default 20) hard-stops the loop.
+- Lazy expiry: `awaiting_device` > 45 s → `DEVICE_TIMEOUT`; stalled
+  `thinking` > 90 s → `AI_TIMEOUT` (checked on turn reads).
 
-## Device pairing
+## Protocol
 
+Command (Worker → device, via long-poll GET /api/device/poll):
+
+```json
+{ "type": "command", "id": "cmd_ab12cd34", "tool": "swipe_up", "arguments": {}, "approved": false }
 ```
-[Android app on first launch]
-  │
-  ├── POST /api/device/register
-  │     { device_name, model, android_version }
-  │
-  ▼
-[Worker]
-  - generates device_id     (e.g. DROID-AB91)
-  - generates pairing_code  (6-digit PIN, valid 10 min)
-  - generates device_secret (32-byte random, stored hashed in D1)
-  - returns all three to the device (the device stores device_secret locally)
 
-[User]
-  - opens Web UI
-  - enters device_id + pairing_code
-  - Web UI POST /api/device/pair → Worker verifies PIN, issues session JWT
+Result (device → Worker, POST /api/device/result):
 
-[All subsequent requests]
-  - Authorization: Bearer <session JWT>
-  - Worker resolves to device_id, routes commands via WSS
+```json
+{ "type": "result", "id": "cmd_ab12cd34", "success": true, "data": { "direction": "up" } }
 ```
+
+Error envelope: `{ "id", "success": false, "error_code": "ELEMENT_NOT_FOUND", "error": "…" }`
+
+Error codes: `ELEMENT_NOT_FOUND`, `PACKAGE_NOT_FOUND`, `NO_WINDOW`,
+`SERVICE_NOT_CONNECTED`, `BLOCKED_COMMAND`, `CONFIRMATION_REQUIRED`,
+`SHELL_UNAVAILABLE`, `UNSUPPORTED_API`, `SCREENSHOT_TIMEOUT`,
+`EXECUTION_FAILED`, `UNKNOWN_TOOL`.
+
+Device auth: `x-device-id` + `x-device-secret` headers. The secret is shown
+once at registration and stored encrypted (EncryptedSharedPreferences) on the
+phone; the Worker stores only SHA-256(pepper + secret).
+
+## API surface
+
+| Endpoint | Auth | Purpose |
+|---|---|---|
+| `GET  /api/health` | — | liveness |
+| `GET  /api/models` | — | model registry (public projection) |
+| `GET  /api/devices` | — | device list for the Web UI |
+| `POST /api/device/register` | rate-limited | bootstrap pairing (returns secret once) |
+| `POST /api/pair/confirm` | rate-limited | confirm PIN from Web UI |
+| `GET  /api/device/poll?wait=20` | device | long-poll for commands (max 25 s hold) |
+| `POST /api/device/result` | device | report result, continues agent loop |
+| `POST /api/device/heartbeat` | device | update info/last_seen |
+| `POST /api/chat` | rate-limited | start a turn |
+| `GET  /api/turn/:id` | — | turn steps/state for the UI |
+| `GET  /api/logs` | — | audit ring buffer (LIVE LOG) |
+| `POST /api/debug/ai` | DEBUG=true only | raw AI response inspection |
+
+## KV schema (4 namespaces)
+
+| Namespace | Keys |
+|---|---|
+| `KV_DEVICES` | `device:<id>` record · `pair:<pin>` → id (15 min TTL) · `turn:<device>` → turnId · `pendingcmd:<device>` command (5 min TTL) · `seen:<device>` presence (2 min TTL) |
+| `KV_TURNS` | `turn:<id>` full turn (24 h TTL) |
+| `KV_RATE` | `rate:<scope>:<window>` counters |
+| `KV_LOGS` | `audit` ring buffer (last 300 events, sanitized) |
 
 ## Data optimization
 
-| Strategy | Where | What |
-|----------|-------|------|
-| Compact JSON | `get_screen_nodes` | Strip empty fields, omit nodes with no text/desc/clickable |
-| Dedup hash | Worker | SHA-256 of canonical tree JSON; if unchanged, return `{unchanged:true}` |
-| Batching | Worker → Device | Multiple tool calls in one WSS frame when independent |
-| Diff mode (planned) | Worker → Device | Send only changed nodes when caller supplies `since=<hash>` |
-| Screenshot lifecycle | Device | Capture → base64 → send → delete from device memory |
+- Compact JSON everywhere (short field names, capped text, node cap 250/400).
+- Accessibility tree hashing (MD5 over package+elements): if unchanged, the
+  device answers `{unchanged: true, hash}` instead of the full tree.
+- Screenshots only on explicit tool call, downscaled to ≤720 px, JPEG q60,
+  discarded after analysis — never stored.
+- Device presence writes are throttled to 1 write / 2 min (KV write limits).
 
-## Error recovery
+## Communication choice: HTTPS long-poll (not WSS)
 
-When a tool returns `success: false`:
-1. Worker records the error code (`ELEMENT_NOT_FOUND`, `TIMEOUT`, `PERMISSION_DENIED`, ...).
-2. Worker injects the error into the conversation as a `tool_result`.
-3. AI decides next step — typically: `get_screen_nodes()` → re-evaluate.
-4. If `get_screen_nodes` returns an unchanged tree (same hash) and AI retries the same
-   failing call → Worker forces `take_screenshot` to give AI new evidence.
-5. If 3 retries fail → Worker sends a `needs_confirmation` event to the user.
+WSS on Workers requires a Durable Object per connection. For the MVP we use
+long-poll (`wait` up to 25 s, 2 s internal interval) which gives sub-3 s
+command latency with zero stateful infra and survives ColorOS background
+limits through the foreground service. The upgrade path (Durable Object +
+WSS for push + presence) is described below.
 
-No infinite retries. No silent failures.
+## ADB bridge (optional)
 
-## Background execution
+`AdbBridge` is an isolated capability layer. The MVP reports
+`isAvailable() == false`; `run_shell` then executes only app-permitted
+commands and fails honestly otherwise (`SHELL_UNAVAILABLE`). A full
+implementation would add:
 
-The Android app runs as a **Foreground Service** with a persistent notification
-("DroidPilot AI is connected"). This is required by Android 8+ for long-running network
-connections and is the only way to keep the WSS channel alive when the app is backgrounded.
+1. Wireless-debugging pairing (Android 11+): PSAKE2+ over mDNS-discovered
+   `adb-tls-pairing` socket (`adb_wifi_enabled` detection already wired).
+2. ADB/TLS client to execute shell as `shell` uid.
+3. Confirmation gating stays in `CommandValidator` either way.
 
-The service is **explicitly visible** to the user (notification cannot be dismissed
-while service is running). This is intentional — hidden services violate Play Store
-policy and user trust.
+The project never assumes ADB exists.
 
-## Optional ADB
+## Known MVP limits (and upgrades)
 
-`AdbBridge` is a **completely optional** layer. If Wireless Debugging is enabled on the
-device AND the user explicitly opts in via in-app toggle, the bridge connects to
-`localhost:5555` and exposes a small set of ADB-backed tools (mostly for diagnostics).
-If ADB is not available, `AdbBridge.isAvailable()` returns `false` and the system falls
-back to Accessibility-only mode. **The MVP works fully without ADB.**
-
-## Security boundaries
-
-```
-Internet
-   │
-   ▼
-[Cloudflare Worker]  ← rate limit, JWT auth, tool allowlist, command validation
-   │
-   ▼ (WSS over TLS)
-[DroidPilot Android]
-   │
-   ├── AccessibilityService  ← Android permission (user-granted, revocable)
-   ├── ForegroundService     ← Android notification required
-   └── AdbBridge (optional)  ← local only, never exposed to network
-```
-
-Every command flows through `CommandValidator` on the device before execution. Shell
-commands are classified `SAFE / REQUIRES_CONFIRMATION / BLOCKED`. `BLOCKED` commands
-(`rm -rf`, `factory reset`, `reboot`, etc.) are rejected before any side effect.
+| Limit | Why | Upgrade |
+|---|---|---|
+| KV eventual consistency, ~1 write/s/key | free-tier KV | Durable Objects for turns/devices |
+| One command at a time per device | simplicity | command queue depth N |
+| AI step chained via `waitUntil` (≤30 s/step) | serverless | DO + alarms, or streaming |
+| Web UI has no user accounts | single-admin MVP | Cloudflare Access in front |

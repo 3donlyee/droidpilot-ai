@@ -1,111 +1,65 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="color-scheme" content="dark" />
-  <meta name="description" content="DroidPilot AI — chat + debug console + device status + model selector." />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>DroidPilot AI</title>
-  <link rel="stylesheet" href="styles.css" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext y='20' font-size='20'%3E%F0%9F%A4%96%3C/text%3E%3C/svg%3E" />
+  <meta name="robots" content="noindex" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%2322D3EE' d='M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71L12 2z'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="/styles.css" />
 </head>
-<body data-state="disconnected" data-debug="closed">
-  <header class="app-header" role="banner">
-    <div class="brand">
-      <svg class="brand-logo" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-        <path fill="currentColor" d="M12 2a5 5 0 0 1 5 5v1h1a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3h-1v1a5 5 0 0 1-5 5H8a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5h4Zm0 2H8a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h4a3 3 0 0 0 3-3v-1h-1a3 3 0 0 1-3-3v-2a3 3 0 0 1 3-3h1V7a3 3 0 0 0-3-3Zm-2 5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm6 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z"/>
-      </svg>
-      <h1 class="brand-title">DroidPilot AI</h1>
-    </div>
-    <div class="header-controls">
-      <span id="status-badge" class="status-badge" data-state="disconnected" aria-label="Connection status">
-        <span class="status-dot"></span>
-        <span class="status-label">Disconnected</span>
-      </span>
-      <button id="debug-toggle" class="icon-btn" type="button" aria-label="Toggle debug console" aria-expanded="false">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 4.5C7 4.5 2.7 7.6 1 12c1.7 4.4 6 7.5 11 7.5s9.3-3.1 11-7.5c-1.7-4.4-6-7.5-11-7.5Zm0 12.5a5 5 0 1 1 0-10 5 5 0 0 1 0 10Zm0-2a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/></svg>
-      </button>
-    </div>
+<body>
+  <header>
+    <div class="brand"><span class="logo">▲</span> DroidPilot AI</div>
+    <div id="deviceChip" class="chip-device">○ No device</div>
   </header>
-  <main class="app-main" role="main">
-    <aside class="sidebar" aria-label="Connection settings">
-      <section class="card">
-        <h2 class="card-title"><svg class="card-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3.4 20.4 14.8 9l1 1L4.4 21.4l-1-1ZM20 14a2 2 0 1 1 0-4 2 2 0 0 1 0 4Zm-4-4a2 2 0 1 1 0-4 2 2 0 0 1 0 4Zm-4-4a2 2 0 1 1 0-4 2 2 0 0 1 0 4Z"/></svg>Worker</h2>
-        <label class="field-label" for="worker-url-input">Worker URL</label>
-        <input id="worker-url-input" class="input" type="url" autocomplete="off" spellcheck="false" placeholder="https://droidpilot-ai.YOUR-SUBDOMAIN.workers.dev" />
-        <button id="connect-btn" class="btn btn-primary" type="button">Connect</button>
-        <p id="worker-status" class="field-hint" aria-live="polite">Enter your Worker URL and click Connect.</p>
-      </section>
-      <section id="pairing-card" class="card">
-        <h2 class="card-title"><svg class="card-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 1a4 4 0 0 1 4 4v3h1a3 3 0 0 1 3 3v3a8 8 0 0 1-16 0v-3a3 3 0 0 1 3-3h1V5a4 4 0 0 1 4-4Zm0 2a2 2 0 0 0-2 2v3h4V5a2 2 0 0 0-2-2Z"/></svg>Pair Device</h2>
-        <label class="field-label" for="device-id-input">Device ID</label>
-        <input id="device-id-input" class="input" type="text" autocomplete="off" spellcheck="false" placeholder="DROID-AB12" disabled />
-        <label class="field-label" for="pairing-code-input">Pairing Code</label>
-        <input id="pairing-code-input" class="input" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="off" spellcheck="false" placeholder="123456" disabled />
-        <button id="pair-btn" class="btn btn-primary" type="button" disabled>Pair</button>
-        <button id="disconnect-btn" class="btn btn-link" type="button" hidden>Disconnect</button>
-        <p id="pair-status" class="field-hint" aria-live="polite">Connect to a Worker first.</p>
-      </section>
-      <section id="model-card" class="card">
-        <h2 class="card-title"><svg class="card-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2 2 7l10 5 10-5-10-5Zm0 9 2.5-1.2L12 8.6 9.5 9.8 12 11Zm0 4-7-3.5V14a8 8 0 0 0 14 0v-2.5L12 15Z"/></svg>Model</h2>
-        <label class="field-label" for="model-select">Selected Model</label>
-        <select id="model-select" class="input" disabled>
-          <option value="">— connect to load models —</option>
-        </select>
-        <div id="model-info" class="model-info" hidden>
-          <div class="model-info-row"><span class="muted">Provider</span><span id="model-provider" class="mono"></span></div>
-          <div class="model-info-row"><span class="muted">Status</span><span id="model-status" class="model-status"></span></div>
-          <div class="model-info-row"><span class="muted">Context</span><span id="model-context" class="mono"></span></div>
-          <div class="caps">
-            <div class="cap"><span class="cap-check" data-on="true">✓</span> Reasoning</div>
-            <div class="cap"><span id="cap-tools" class="cap-check" data-on="false">✗</span> Tool Calling</div>
-            <div class="cap"><span id="cap-vision" class="cap-check" data-on="false">✗</span> Vision</div>
-          </div>
-          <p id="model-desc" class="model-desc muted"></p>
-        </div>
-      </section>
-    </aside>
-    <section class="chat" aria-label="Chat conversation">
-      <header class="chat-header">
-        <div class="chat-device">
-          <span id="chat-device-name" class="muted">No device connected</span>
-          <span id="chat-device-model" class="muted mono"></span>
-        </div>
-        <div class="chat-indicator" id="chat-indicator" hidden>
-          <span class="typing-dots"><i></i><i></i><i></i></span>
-          <span class="muted">Generating…</span>
-        </div>
-      </header>
-      <div id="messages" class="messages" role="log" aria-live="polite" aria-atomic="false">
-        <div class="empty-state" id="empty-state">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a5 5 0 0 1 5 5v1h1a3 3 0 0 1 3 3v2a3 3 0 0 1-3 3h-1v1a5 5 0 0 1-5 5H8a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5h4Zm-2 8a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm6 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z"/></svg>
-          <p>Connect to a device to start chatting.</p>
-        </div>
+
+  <main class="grid">
+    <!-- Pairing -->
+    <section class="card" id="pairCard">
+      <h3>Device Pairing</h3>
+      <p class="hint">In the app press <b>Connect</b>, then enter the 6-digit PIN here.</p>
+      <div class="row">
+        <select id="deviceSelect"><option value="">No pending devices…</option></select>
+        <input id="pinInput" inputmode="numeric" maxlength="6" placeholder="PIN" />
+        <button id="btnPair" class="primary">Pair</button>
       </div>
-      <footer class="composer">
-        <textarea id="message-input" class="input composer-input" rows="1" placeholder="Send a message — e.g. open Chrome and search for…" disabled></textarea>
-        <button id="send-btn" class="btn btn-primary composer-send" type="button" disabled aria-label="Send message">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 3l18 9-18 9 4-9-4-9Zm4.5 3.5L9 11l-2.5 5.5L17 12 7.5 6.5Z"/></svg>
-          <span>Send</span>
-        </button>
-      </footer>
+      <div id="pairMsg" class="hint"></div>
+    </section>
+
+    <!-- Model selector -->
+    <section class="card" id="modelCard">
+      <h3>AI Model</h3>
+      <select id="modelSelect"></select>
+      <div id="modelMeta" class="meta">
+        <div>Provider: <b>—</b></div>
+        <div class="caps">
+          <span class="no">✗ Reasoning</span>
+          <span class="no">✗ Tool Calling</span>
+          <span class="no">✗ Vision</span>
+        </div>
+        <div>Status: <span class="dot red"></span> —</div>
+      </div>
+    </section>
+
+    <!-- Chat -->
+    <section class="card chat" id="chatCard">
+      <h3>Chat</h3>
+      <div id="messages" class="messages"><div class="empty">Pair a device, pick a model, then send a command like: <b>افتح TikTok وانتقل للفيديو التالي</b></div></div>
+      <form id="chatForm">
+        <input id="chatInput" placeholder="e.g. Open TikTok and go to the next video" autocomplete="off" />
+        <button class="primary" id="btnSend" type="submit">Send</button>
+      </form>
+    </section>
+
+    <!-- Live log -->
+    <section class="card log" id="logCard">
+      <h3>LIVE LOG</h3>
+      <div id="liveLog" class="livelog"></div>
     </section>
   </main>
-  <section id="debug-console" class="debug-console" role="region" aria-label="Debug console" hidden>
-    <header class="debug-header">
-      <h3 class="debug-title">Debug Console</h3>
-      <div class="debug-actions">
-        <button id="debug-clear" class="icon-btn" type="button" aria-label="Clear debug log">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M9 3h6v1h5v2H4V4h5V3Zm-2 5h10l-1 13H8L7 8Zm2.5 2-.4 9h1.8l.4-9h-1.8Zm4 0 .4 9h1.8l-.4-9h-1.8Z"/></svg>
-        </button>
-        <button id="debug-close" class="icon-btn" type="button" aria-label="Close debug console">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6.4 5 5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12 19 6.4 17.6 5 12 10.6 6.4 5Z"/></svg>
-        </button>
-      </div>
-    </header>
-    <div id="debug-log" class="debug-log" tabindex="0"></div>
-  </section>
-  <div id="debug-scrim" class="debug-scrim" hidden></div>
-  <script src="app.js" defer></script>
+
+  <footer>DroidPilot AI — Android Agent · Cloudflare Worker · Workers AI <span id="health"></span></footer>
+  <script src="/app.js"></script>
 </body>
 </html>

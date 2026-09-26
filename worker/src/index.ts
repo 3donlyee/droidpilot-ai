@@ -1,116 +1,133 @@
-import { Router } from "itty-router";
 import type { Env } from "./env";
-import { AuthManager } from "./auth/AuthManager";
-import { PairingManager } from "./auth/PairingManager";
-import { DeviceRegistry } from "./device/DeviceRegistry";
-import { logger } from "./utils/logger";
-import { corsHeaders, preflightResponse, applyCors } from "./utils/cors";
-import { jsonResponse, errorResponse } from "./utils/response";
-import { handleRegister, handlePair, handleStatus } from "./routes/pair";
-import { handleListModels, handleGetModel } from "./routes/models";
-import { handleChat } from "./routes/chat";
-import { handleDeviceWS } from "./routes/device";
-
-/**
- * DroidPilot AI — Worker entry point.
- *
- * Exposes:
- *   - fetch:      All HTTP routes + WebSocket upgrades.
- *
- * NOTE: Cloudflare Workers do NOT support a separate `websockets` export on
- * the default Worker object. WebSocket connections are handled WITHIN `fetch`
- * by detecting the `Upgrade: websocket` header and returning a `Response`
- * with `webSocket: <client>` (see routes/device.ts). The Durable Objects API
- * does have a `webSocket` handler, but plain Workers do not — so we route
- * everything through `fetch`.
- *
- * Routes:
- *   GET  /                       — Health check.
- *   GET  /api/models             — List enabled models. (public)
- *   GET  /api/models/:id         — Get one model.      (public)
- *   POST /api/device/register    — Android first-launch. (public, rate-limited)
- *   POST /api/device/pair        — Web UI pairing.       (public, rate-limited)
- *   GET  /api/device/status      — Session status.       (auth)
- *   POST /api/chat               — SSE chat stream.      (auth, rate-limited)
- *   GET  /api/device/ws          — Device WebSocket.     (auth via query or in-band)
- *   GET  /api/device/connect     — Alias of /api/device/ws (backward compat with Android v1)
- */
-
-// In-memory device registry — one per Worker isolate. Devices reconnect on
-// isolate eviction; this is acceptable for the MVP.
-const devices = new DeviceRegistry();
-
-const router = Router();
-
-router
-  .get("/", () => jsonResponse({ ok: true, service: "droidpilot-ai", version: "0.1.0" }))
-  .get("/api/models", handleListModels)
-  .get("/api/models/:id", handleGetModel)
-  .post("/api/device/register", handleRegister)
-  .post("/api/device/pair", handlePair)
-  .get("/api/device/status", handleStatus)
-  .post("/api/chat", handleChat)
-  .all("*", () => errorResponse("not_found", 404));
-
-export interface WorkerCtx {
-  devices: DeviceRegistry;
-}
+import { json, readJson, ipOf } from "./util";
+import { publicModels } from "./models";
+import { registerDevice, confirmPairing, verifyDevice, touchDevice, listDevices, heartbeat, publicDevice } from "./devices";
+import { startTurn, pollCommand, applyDeviceResult, getTurnResponse } from "./agent";
+import { rateLimit } from "./ratelimit";
+import { audit, getLogs } from "./audit";
 
 export default {
-  async fetch(req: Request, env: Env, _executionCtx: ExecutionContext): Promise<Response> {
-    // CORS preflight (short-circuit before anything else).
-    if (req.method === "OPTIONS") {
-      return preflightResponse(env, req);
-    }
-
+  async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url);
-
-    // WebSocket upgrade — handle separately (not via itty-router).
-    const upgrade = req.headers.get("Upgrade");
-    if (
-      upgrade &&
-      upgrade.toLowerCase() === "websocket" &&
-      (url.pathname === "/api/device/ws" || url.pathname === "/api/device/connect")
-    ) {
-      try {
-        const auth = new AuthManager(env);
-        const pairing = new PairingManager(env, auth);
-        return await handleDeviceWS(req, { env, devices, pairing });
-      } catch (e) {
-        logger.error("ws upgrade error", {
-          error: e instanceof Error ? e.message : String(e),
-        });
-        return errorResponse("internal_error", 500, env, req);
-      }
-    }
+    const path = url.pathname;
 
     try {
-      // Pass `(env, ctx)` as extra args to every handler. Each handler picks
-      // what it needs from the front of the args list.
-      const ctx: WorkerCtx = { devices };
-      const response = await router
-        .handle(req, env, ctx)
-        .catch((e: unknown) => {
-          logger.error("router error", {
-            error: e instanceof Error ? e.message : String(e),
-          });
-          return errorResponse("internal_error", 500, env, req);
-        });
-
-      if (!response) {
-        return applyCors(env, errorResponse("not_found", 404, env, req), req);
+      if (path.startsWith("/api/")) {
+        return await handleApi(req, env, ctx, path);
       }
-
-      // Apply CORS to every response (including errors).
-      return applyCors(env, response, req);
-    } catch (e) {
-      logger.error("unhandled error", {
-        error: e instanceof Error ? e.message : String(e),
-      });
-      return applyCors(env, errorResponse("internal_error", 500, env, req), req);
+      // Static Web UI (same origin → no CORS needed)
+      if (req.method === "GET") {
+        return env.ASSETS.fetch(req);
+      }
+      return json({ ok: false, error: "NOT_FOUND" }, 404);
+    } catch (e: any) {
+      return json({ ok: false, error: "INTERNAL", message: String(e?.message ?? e).slice(0, 300) }, 500);
     }
   },
-} satisfies ExportedHandler<Env>;
+};
 
-// Re-export the CORS helper for ad-hoc usage (e.g. in tests).
-export { corsHeaders };
+async function handleApi(req: Request, env: Env, ctx: ExecutionContext, path: string): Promise<Response> {
+  const method = req.method;
+
+  // ---------------------------------------------------------- public reads
+  if (method === "GET" && path === "/api/health") {
+    return json({ ok: true, service: "droidpilot-ai", time: Date.now() });
+  }
+  if (method === "GET" && path === "/api/models") {
+    return json({ ok: true, models: publicModels() });
+  }
+  if (method === "GET" && path === "/api/devices") {
+    return listDevices(env);
+  }
+  if (method === "GET" && path === "/api/logs") {
+    return getLogs(env, 100);
+  }
+
+  // ------------------------------------------------------------- pairing
+  if (method === "POST" && path === "/api/device/register") {
+    return registerDevice(env, req);
+  }
+  if (method === "POST" && path === "/api/pair/confirm") {
+    return confirmPairing(env, req);
+  }
+
+  // ------------------------------------------------- device-authenticated
+  if (path === "/api/device/poll" || path === "/api/device/result" || path === "/api/device/heartbeat") {
+    const rec = await verifyDevice(env, req);
+    if (!rec) {
+      await audit(env, "auth_failed", { device: req.headers.get("x-device-id") ?? "?" });
+      return json({ ok: false, error: "UNAUTHORIZED" }, 401);
+    }
+    await touchDevice(env, rec);
+
+    if (method === "GET" && path === "/api/device/poll") {
+      const wait = parseInt(new URL(req.url).searchParams.get("wait") ?? "20", 10);
+      return pollCommand(env, rec, Number.isFinite(wait) ? wait : 20);
+    }
+    if (method === "POST" && path === "/api/device/result") {
+      const body = await readJson(req);
+      if (!body?.id) return json({ ok: false, error: "INVALID_ARGUMENT" }, 400);
+      return applyDeviceResult(env, ctx, rec, {
+        id: String(body.id),
+        success: !!body.success,
+        data: body.data ?? null,
+        error: body.error ?? null,
+        error_code: body.error_code ?? null,
+      });
+    }
+    if (method === "POST" && path === "/api/device/heartbeat") {
+      return heartbeat(env, req, rec);
+    }
+  }
+
+  // -------------------------------------------------------------- chat
+  if (method === "POST" && path === "/api/chat") {
+    if (!(await rateLimit(env, `chat:${ipOf(req)}`, 10, 60))) {
+      return json({ ok: false, error: "RATE_LIMITED", hint: "Max 10 chats per minute" }, 429);
+    }
+    const body = await readJson(req);
+    const message = String(body?.message ?? "").trim();
+    const deviceId = String(body?.device_id ?? "");
+    if (!message) return json({ ok: false, error: "EMPTY_MESSAGE" }, 400);
+    if (!deviceId) return json({ ok: false, error: "NO_DEVICE", hint: "Pair a device first" }, 400);
+
+    const raw = await env.KV_DEVICES.get(`device:${deviceId}`);
+    if (!raw) return json({ ok: false, error: "DEVICE_NOT_FOUND" }, 404);
+    const rec = JSON.parse(raw);
+    if (rec.status !== "active") return json({ ok: false, error: "DEVICE_NOT_PAIRED" }, 409);
+
+    return startTurn(env, ctx, deviceId, message, body?.model_id ?? null);
+  }
+
+  // ------------------------------------------------------------- turns
+  if (method === "GET" && path.startsWith("/api/turn/")) {
+    const turnId = path.slice("/api/turn/".length);
+    return getTurnResponse(env, turnId);
+  }
+
+  // ------------------------------------------------------------- debug
+  if (method === "POST" && path === "/api/debug/ai" && env.DEBUG === "true") {
+    const body = await readJson(req);
+    const { getProvider } = await import("./ai/provider");
+    const { TOOL_SCHEMAS } = await import("./tools");
+    const provider = getProvider(env, body?.model_id);
+    const messages = Array.isArray(body?.messages)
+      ? body.messages
+      : [
+          { role: "system", content: "You are a diagnostic agent. Use the tools available to test tool-calling." },
+          { role: "user", content: String(body?.prompt ?? "Call get_device_info now.") },
+        ];
+    const result = await provider.chat(body?.model_id ?? "@cf/openai/gpt-oss-20b", messages, TOOL_SCHEMAS);
+    return json({
+      ok: true,
+      provider: provider.name,
+      style: result.style ?? null,
+      text: result.text,
+      toolCalls: result.toolCalls,
+      raw_type: typeof result.raw,
+      raw_preview: JSON.stringify(result.raw)?.slice(0, 1200) ?? null,
+    });
+  }
+
+  return json({ ok: false, error: "NOT_FOUND" }, 404);
+}

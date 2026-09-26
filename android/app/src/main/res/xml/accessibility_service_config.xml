@@ -1,20 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  DroidPilot AI — AccessibilityService configuration
-
-  - typeAllMask           : we listen for all events (but in practice we poll via rootInActiveWindow)
-  - canRetrieveWindowContent="true" : REQUIRED to read the AccessibilityNodeInfo tree
-  - packageNames empty    : observe ALL packages (so the agent can act across apps)
-  - notificationTimeout=100ms : throttle event batching
-  - flags                 : include input nodes, observe not-important views so we get the FULL tree
--->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-    android:description="@string/accessibility_service_description"
-    android:accessibilityEventTypes="typeAllMask"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
-    android:accessibilityFlags="flagDefault|flagIncludeNotImportantViews|flagReportViewIds|flagRetrieveInteractiveWindows"
+    android:accessibilityFlags="flagDefault|flagReportViewIds|flagRetrieveInteractiveWindows"
     android:canRetrieveWindowContent="true"
     android:canPerformGestures="true"
     android:notificationTimeout="100"
-    android:packageNames=""
-    android:summary="@string/accessibility_service_label" />
+    android:accessibilityDescription="@string/a11y_description" />

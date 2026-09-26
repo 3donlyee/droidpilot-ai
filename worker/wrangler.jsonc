@@ -1,46 +1,39 @@
+// DroidPilot AI — Cloudflare Worker configuration.
+//
+// IMPORTANT (security): no secrets live in this file or anywhere in the repo.
+//   - DEVICE_AUTH_SECRET   → `wrangler secret put DEVICE_AUTH_SECRET`
+//   - OPENAI_API_KEY       → only if you enable the "openai-compat" provider
+// The KV namespace ids below are account-specific but are NOT secrets
+// (standard wrangler practice). For a fresh Cloudflare account, either delete
+// them and run scripts/deploy-cloudflare.sh (auto-creates + injects), or run:
+//   wrangler kv namespace create KV_DEVICES   (…and the other three)
 {
-  // DroidPilot AI — Cloudflare Worker configuration.
-  // Format: JSONC (JSON with comments).
-  //
-  // SECRETS: do NOT put any secrets in this file. All secrets (DEVICE_AUTH_SECRET,
-  // OPENAI_API_KEY) are managed via `wrangler secret put ...` and stored in
-  // Cloudflare's encrypted secret store. They appear as fields on the Env
-  // interface at runtime but are never written to source or wrangler.jsonc.
-  //
-  // KV NAMESPACE: create the `DEVICE_SESSIONS` namespace via
-  //   npx wrangler kv namespace create DEVICE_SESSIONS
-  // then paste the returned `id` below in place of REPLACE_WITH_KV_ID.
-  //
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "droidpilot-ai",
   "main": "src/index.ts",
-  "compatibility_date": "2025-09-01",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_date": "2025-08-01",
 
-  // Workers AI binding — exposes `env.AI` at runtime.
+  // Static Web UI served from ../web (same origin as the API → no CORS needed)
+  "assets": {
+    "directory": "../web",
+    "binding": "ASSETS"
+  },
+
+  // Workers AI binding — accessed as env.AI
   "ai": {
     "binding": "AI"
   },
 
-  // KV namespace for pairing codes, redeemed device records, and rate-limit
-  // buckets. Replace the placeholder id before deploying.
   "kv_namespaces": [
-    {
-      "binding": "DEVICE_SESSIONS",
-      "id": "REPLACE_WITH_KV_ID"
-    }
+    { "binding": "KV_DEVICES", "id": "aeccd1e48588423e96bed09ba89b2cb8" },
+    { "binding": "KV_TURNS",   "id": "7b958ae3aab34ae6aba4a783a1f2624b" },
+    { "binding": "KV_RATE",    "id": "2ab59f32624a4c0a9bae501b36aad5c6" },
+    { "binding": "KV_LOGS",    "id": "ebe9df399ca04d37a7e707208af08c29" }
   ],
 
-  // Non-secret configuration vars. Override per-environment via
-  //   wrangler deploy --env production  (with [env.production] overrides)
-  // or via the Cloudflare dashboard.
   "vars": {
     "MAX_TOOL_CALLS_PER_TURN": "20",
-    "DEFAULT_MODEL_ID": "@cf/openai/gpt-oss-20b",
-    "ALLOWED_ORIGIN": "*"
-  },
-
-  "observability": {
-    "enabled": true
+    "AI_PROVIDER": "workers-ai",
+    "DEBUG": "false"
   }
 }
