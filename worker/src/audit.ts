@@ -4,8 +4,11 @@ import type { Env } from "./env";
  * Minimal audit/live log (KV ring buffer, last 300 entries).
  * NEVER log API keys, tokens, device secrets, or raw message content here —
  * only event types, ids, tool names and success flags.
+ *
+ * Set AUDIT_MODE="off" (var) to disable audit writes entirely (KV write budget).
  */
 export async function audit(env: Env, event: string, info: Record<string, any> = {}): Promise<void> {
+  if (env.AUDIT_MODE === "off") return;
   try {
     const raw = await env.KV_LOGS.get("audit");
     const arr: any[] = raw ? JSON.parse(raw) : [];

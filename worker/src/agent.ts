@@ -155,7 +155,8 @@ export async function agentStep(env: Env, turnId: string): Promise<void> {
       await saveTurn(env, turn);
       // Command queue: the device long-polls this key.
       await env.KV_DEVICES.put(`pendingcmd:${turn.device_id}`, JSON.stringify(cmd), { expirationTtl: 300 });
-      await audit(env, "tool_call", { turn: turnId, device: turn.device_id, tool: tc.name });
+      // (audit for tool_call removed — tool_result below logs the same info + outcome;
+      //  halves audit writes to respect the free-tier KV daily quota)
     } else {
       await finishTurn(env, turn, result.text ?? "(empty response)");
     }

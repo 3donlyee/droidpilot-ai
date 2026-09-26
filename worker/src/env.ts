@@ -24,4 +24,6 @@ export interface Env {
   DEVICE_AUTH_SECRET?: string;
   /** "true" enables /api/debug/ai. Keep "false" in production. */
   DEBUG?: string;
+  /** "off" disables audit KV writes (free-tier KV write budget). Default: on. */
+  AUDIT_MODE?: string;
 }

@@ -130,13 +130,20 @@ export async function verifyDevice(env: Env, req: Request): Promise<DeviceRecord
   return rec;
 }
 
-/** Throttled presence update — max 1 KV write / 2 min / device (KV write limits). */
+/** Throttled presence update — max 1 KV write / 30 min / device.
+ * Free-tier KV allows only 1,000 writes/day: a 24/7 polling device must NOT
+ * write per poll (the old 2-min throttle burned 1,440 writes/day alone and
+ * exhausted the daily quota → HTTP 500 on every write path). */
 export async function touchDevice(env: Env, rec: DeviceRecord): Promise<void> {
-  const seenKey = `seen:${rec.device_id}`;
-  if (await env.KV_DEVICES.get(seenKey)) return;
-  rec.last_seen = now();
-  await env.KV_DEVICES.put(`device:${rec.device_id}`, JSON.stringify({ ...rec, last_seen: rec.last_seen }));
-  await env.KV_DEVICES.put(seenKey, "1", { expirationTtl: 120 });
+  try {
+    const seenKey = `seen:${rec.device_id}`;
+    if (await env.KV_DEVICES.get(seenKey)) return;
+    rec.last_seen = now();
+    await env.KV_DEVICES.put(`device:${rec.device_id}`, JSON.stringify({ ...rec, last_seen: rec.last_seen }));
+    await env.KV_DEVICES.put(seenKey, "1", { expirationTtl: 1800 });
+  } catch {
+    // never break the poll path on KV write limits — presence is best-effort
+  }
 }
 
 // ------------------------------------------------------------------- list
@@ -151,7 +158,8 @@ export function publicDevice(rec: DeviceRecord) {
     status: rec.status,
     last_seen: rec.last_seen ?? null,
     created_at: rec.created_at,
-    connected: rec.status === "active" && (rec.last_seen ?? 0) > now() - 120_000,
+    connected: rec.status === "active" && (rec.last_seen ?? 0) > now() - 35 * 60_000,
+    // presence is throttled to 1 write / 30 min → the online window is coarse by design
   };
 }
 
@@ -175,11 +183,10 @@ export async function listDevices(env: Env): Promise<Response> {
   return json({ ok: true, devices: out });
 }
 
+/** Heartbeat is write-free — presence is maintained by the throttled touchDevice.
+ * (Writing the device record per heartbeat would burn the free-tier KV daily quota.) */
 export async function heartbeat(env: Env, req: Request, rec: DeviceRecord): Promise<Response> {
-  const body: any = await req.json().catch(() => ({}));
-  if (body?.model) rec.model = String(body.model).slice(0, 80);
-  if (body?.android_version) rec.android_version = String(body.android_version).slice(0, 20);
-  rec.last_seen = now();
-  await env.KV_DEVICES.put(`device:${rec.device_id}`, JSON.stringify(rec));
+  void req;
+  void rec;
   return json({ ok: true, server_time: now() });
 }
