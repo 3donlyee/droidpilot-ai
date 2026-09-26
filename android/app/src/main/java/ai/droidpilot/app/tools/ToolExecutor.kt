@@ -280,14 +280,14 @@ class ToolExecutor(private val context: Context) {
 
         val deferred = CompletableDeferred<Bitmap?>()
         val executor = ContextCompat.getMainExecutor(context)
-        try {
-            s.takeScreenshot(Display.DEFAULT_DISPLAY, executor) { resultCode, shot ->
+        val callback = object : AccessibilityService.TakeScreenshotCallback {
+            override fun onScreenshotCaptured(
+                resultCode: Int,
+                screenshot: AccessibilityService.ScreenshotResult
+            ) {
                 try {
-                    if (resultCode != AccessibilityService.SCREENSHOT_RESULT_SUCCESS) {
-                        deferred.complete(null)
-                        return@takeScreenshot
-                    }
-                    val hw = shot.hardwareBuffer
+                    // SCREENSHOT_RESULT_SUCCESS == 0
+                    val hw = if (resultCode == 0) screenshot.hardwareBuffer else null
                     val bm: Bitmap? = if (hw != null) {
                         val wrapped = Bitmap.wrapHardwareBuffer(
                             hw, ColorSpace.get(ColorSpace.Named.SRGB)
@@ -301,6 +301,9 @@ class ToolExecutor(private val context: Context) {
                     deferred.complete(null)
                 }
             }
+        }
+        try {
+            s.takeScreenshot(Display.DEFAULT_DISPLAY, executor, callback)
         } catch (t: Throwable) {
             return fail(id, "SCREENSHOT_UNSUPPORTED", t.message)
         }
