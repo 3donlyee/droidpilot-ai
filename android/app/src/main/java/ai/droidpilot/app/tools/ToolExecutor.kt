@@ -87,7 +87,8 @@ class ToolExecutor(private val context: Context) {
         }
 
     private fun notConnected(id: String) =
-        fail(id, "SERVICE_NOT_CONNECTED", "Accessibility service is not enabled")
+        fail(id, "SERVICE_NOT_CONNECTED",
+            "Accessibility service is enabled but not registered yet — toggle it OFF and ON once, then reopen TikTok")
 
     // ----------------------------------------------------------------- tools
 
@@ -117,14 +118,18 @@ class ToolExecutor(private val context: Context) {
 
     private fun currentPackage(id: String): JSONObject {
         val s = svc(id) ?: return notConnected(id)
-        val pkg = s.foregroundPackage()
+        // Retry briefly: right after open_app the new window may not be active yet.
+        val root = s.waitForRoot(2500)
             ?: return fail(id, "NO_WINDOW", "No active window available")
+        val pkg = root.packageName?.toString()
+            ?: return fail(id, "NO_WINDOW", "Active window has no package")
         return ok(id, JSONObject().put("package", pkg))
     }
 
     private fun screenNodes(id: String, args: JSONObject): JSONObject {
         val s = svc(id) ?: return notConnected(id)
-        val root = s.rootInActiveWindow
+        // Retry briefly — handles the window transition right after open_app.
+        val root = s.waitForRoot(2500)
             ?: return fail(id, "NO_WINDOW", "No active window available")
 
         val maxNodes = args.optInt("max_nodes", 250).coerceIn(10, 400)

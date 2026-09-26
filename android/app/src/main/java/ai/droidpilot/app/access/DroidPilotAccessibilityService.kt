@@ -33,7 +33,12 @@ class DroidPilotAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
-        LogSystem.log("a11y", "accessibility service connected")
+        // CRITICAL FIX: register the bound instance so ToolExecutor can reach it.
+        // Without this, instance stays null forever and every a11y-dependent
+        // tool fails with SERVICE_NOT_CONNECTED even when the service is
+        // genuinely enabled on the device.
+        instance = this
+        LogSystem.log("a11y", "accessibility service connected — instance registered")
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -48,8 +53,24 @@ class DroidPilotAccessibilityService : AccessibilityService() {
     override fun onInterrupt() {}
 
     override fun onUnbind(intent: android.content.Intent?): Boolean {
+        // Clear on unbind too (rebind cycles call onServiceConnected again).
+        instance = null
         LogSystem.log("a11y", "accessibility service unbound")
         return super.onUnbind(intent)
+    }
+
+    /**
+     * Waits up to [timeoutMs] for an active window root — window transitions
+     * (e.g. right after open_app) leave rootInActiveWindow null briefly.
+     */
+    fun waitForRoot(timeoutMs: Long = 2500L): AccessibilityNodeInfo? {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        var root = rootInActiveWindow
+        while (root == null && System.currentTimeMillis() < deadline) {
+            Thread.sleep(150)
+            root = rootInActiveWindow
+        }
+        return root
     }
 
     override fun onDestroy() {
