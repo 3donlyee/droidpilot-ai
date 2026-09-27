@@ -73,7 +73,7 @@ export async function startTurn(
     deviceInfo = raw ? JSON.parse(raw) : undefined;
   } catch {}
 
-  // === Aiminos mind: pick the specialist + load the three-tier memory ===
+  // === aMiNo mind: pick the specialist + load the three-tier memory ===
   const agent = pickAgent(message, agentId ?? null);
   const [memBlock, hist] = await Promise.all([
     memory.memoryBlock(env, deviceId),
@@ -140,6 +140,8 @@ export async function agentStep(env: Env, ctx: ExecutionContext, turnId: string)
 
     if (result.toolCalls.length > 0) {
       const tc = result.toolCalls[0]; // one command at a time
+      // Sanitize model artifacts: some models emit "tool<|channel|>…" fragments.
+      tc.name = String(tc.name ?? "").split("<|")[0].trim();
       const cmdId = `cmd_${randomId(8).toLowerCase()}`;
       let args = safeJsonParse(tc.args) ?? {};
       if (typeof args !== "object") args = { value: args };

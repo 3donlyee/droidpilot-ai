@@ -14,7 +14,7 @@
  * CURRENT ACTIVE (100% FREE): Cloudflare Workers AI models only — no API keys,
  * no OpenRouter, no paid plans. Workers AI free tier = daily Neuron allocation.
  * Paid/OpenRouter entries are kept disabled for one-flag re-enable later.
- * Aiminos branding: Core (smart), Fast (speed), Vision (screenshots).
+ * aMiNo branding: Core (smart), Fast (speed), Vision (screenshots).
  */
 export interface ModelEntry {
   id: string;
@@ -50,10 +50,10 @@ export const MODELS: ModelEntry[] = [
     reasoning: false,
     enabled: false,
   },
-  // --- Aiminos engines (100% FREE — Cloudflare Workers AI, no keys) ---
+  // --- aMiNo engines (100% FREE — Cloudflare Workers AI, no keys) ---
   {
     id: "@cf/openai/gpt-oss-20b",
-    displayName: "Aiminos Core",
+    displayName: "aMiNo Core",
     provider: "cloudflare",
     supportsTools: true,
     supportsVision: false,
@@ -63,7 +63,7 @@ export const MODELS: ModelEntry[] = [
   },
   {
     id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
-    displayName: "Aiminos Fast",
+    displayName: "aMiNo Fast",
     provider: "cloudflare",
     supportsTools: true,
     supportsVision: false,
@@ -72,7 +72,7 @@ export const MODELS: ModelEntry[] = [
   },
   {
     id: "@cf/meta/llama-4-scout-17b-16e-instruct",
-    displayName: "Aiminos Vision",
+    displayName: "aMiNo Vision",
     provider: "cloudflare",
     supportsTools: true,
     supportsVision: true,

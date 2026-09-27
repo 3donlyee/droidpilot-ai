@@ -1,138 +1,108 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="color-scheme" content="dark">
-<title>Aiminos — عقل هاتفك</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%237C5CFF'/%3E%3Cstop offset='1' stop-color='%2322D3EE'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Ctext x='16' y='22' font-size='16' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='bold'%3EA%3C/text%3E%3C/svg%3E">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>aMiNo — وكيل هاتفك الذكي</title>
+  <meta name="robots" content="noindex" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='16,3 27,9.5 27,22.5 16,29 5,22.5 5,9.5' fill='none' stroke='%2322d3ee' stroke-width='2.4' stroke-linejoin='round'/%3E%3Ccircle cx='16' cy='16' r='3' fill='%2322d3ee'/%3E%3Ccircle cx='16' cy='8' r='1.8' fill='%23a78bfa'/%3E%3Ccircle cx='22.5' cy='19.5' r='1.8' fill='%23a78bfa'/%3E%3Ccircle cx='9.5' cy='19.5' r='1.8' fill='%23a78bfa'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-
-<header class="top">
-  <div class="brand">
-    <span class="logo">A</span>
-    <div><b>Aiminos</b><small>عقل هاتفك</small></div>
-  </div>
-  <nav class="tabs" id="tabs">
-    <button data-tab="chat" class="on">💬 الدردشة</button>
-    <button data-tab="team">🤝 الفريق</button>
-    <button data-tab="memory">🧠 الذاكرة</button>
-    <button data-tab="devices">📱 الأجهزة</button>
-    <button data-tab="settings">⚙️</button>
-    <button data-tab="logs">📋</button>
-  </nav>
-  <div class="conn"><span class="dot" id="connDot"></span><span id="connText">جارٍ الاتصال…</span></div>
-</header>
-
-<main>
-
-  <!-- ============================ CHAT ============================ -->
-  <section id="tab-chat" class="tab on">
-    <div class="chatbar">
-      <span class="chip" id="chatDevice">لا جهاز</span>
-      <select id="agentSel" title="الوكيل"></select>
-      <select id="modelSel" title="النموذج"></select>
-    </div>
-    <div class="log" id="chatLog">
-      <div class="hello">
-        <div class="hello-logo">A</div>
-        <h1>مرحبًا، أنا <b>Aiminos</b></h1>
-        <p>اكتب أمرًا… أو اضغط 🎤 وتحدث. أراك وأتصرف في هاتفك.</p>
+  <header>
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 32 32" width="30" height="30" aria-hidden="true">
+        <polygon points="16,3 27,9.5 27,22.5 16,29 5,22.5 5,9.5" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>
+        <line x1="16" y1="16" x2="16" y2="8"   stroke="var(--violet)" stroke-width="1.4"/>
+        <line x1="16" y1="16" x2="22.5" y2="19.5" stroke="var(--violet)" stroke-width="1.4"/>
+        <line x1="16" y1="16" x2="9.5" y2="19.5"  stroke="var(--violet)" stroke-width="1.4"/>
+        <line x1="16" y1="16" x2="21.5" y2="12"   stroke="var(--violet)" stroke-width="1.2"/>
+        <circle cx="16" cy="16" r="2.6" fill="var(--accent)"/>
+        <circle cx="16" cy="8" r="1.7" fill="var(--violet)"/>
+        <circle cx="22.5" cy="19.5" r="1.7" fill="var(--violet)"/>
+        <circle cx="9.5" cy="19.5" r="1.7" fill="var(--violet)"/>
+        <circle cx="21.5" cy="12" r="1.4" fill="var(--violet)"/>
+      </svg>
+      <div class="brand-text">
+        <span class="brand-name">aMiNo</span>
+        <span class="brand-sub">عقلك المدبّر</span>
       </div>
     </div>
-    <div class="composer">
-      <button class="ghost" id="btnStop" title="إيقاف المهمة" hidden>⏹</button>
-      <button class="ghost" id="btnResume" title="متابعة آخر مهمة" hidden>▶</button>
-      <button class="ghost" id="btnMic" title="تحدث">🎤</button>
-      <textarea id="msg" rows="1" placeholder="اكتب أمرًا…"></textarea>
-      <button class="primary" id="btnSend">➤</button>
-    </div>
-    <div class="micstate" id="micState" hidden>🎙️ أستمع إليك…</div>
-  </section>
+    <div id="deviceChip" class="chip-device">○ لا يوجد جهاز</div>
+  </header>
 
-  <!-- ============================ TEAM ============================ -->
-  <section id="tab-team" class="tab">
-    <h2 class="pagetitle">فريق الوكلاء <small>يوجَّه تلقائيًا حسب أمرك — أو اختر يدويًا من الدردشة</small></h2>
-    <div class="cards" id="teamCards"></div>
-  </section>
+  <main class="grid">
 
-  <!-- ============================ MEMORY ============================ -->
-  <section id="tab-memory" class="tab">
-    <h2 class="pagetitle">ذاكرة Aiminos <small>حقائق دائمة · ملخص الجلسات · آخر الحوارات</small></h2>
-    <div class="memgrid">
-      <div class="card">
-        <h3>🔐 حقائق دائمة</h3>
-        <form id="memAdd" class="memadd">
-          <input id="memKey" placeholder="الاسم (مثال: حسابي)" maxlength="40">
-          <input id="memVal" placeholder="القيمة (مثال: رابط قناتي …)" maxlength="200">
-          <button class="primary">حفظ</button>
-        </form>
-        <ul class="facts" id="factList"></ul>
+    <!-- الفريق -->
+    <section class="card" id="teamCard">
+      <h3><span class="ic violet">⬡</span> الفريق</h3>
+      <p class="hint">aMiNo يوزّع المهمة على مختصين — أو اختر الوكيل بنفسك.</p>
+      <div id="teamChips" class="team-chips"></div>
+    </section>
+
+    <!-- الاقتران -->
+    <section class="card" id="pairCard">
+      <h3><span class="ic">🔗</span> الاقتران</h3>
+      <p class="hint">في التطبيق اضغط <b>Connect</b>، ثم أدخل رمز الـ 6 أرقام هنا.</p>
+      <div class="row">
+        <select id="deviceSelect"><option value="">لا توجد أجهزة قيد الاقتران…</option></select>
+        <input id="pinInput" inputmode="numeric" maxlength="6" placeholder="● ● ● ● ● ●" />
+        <button id="btnPair" class="primary">اقتران</button>
       </div>
-      <div class="card">
-        <h3>📜 ملخص الجلسات</h3>
-        <p class="summary" id="memSummary">—</p>
-        <h3>🕑 آخر الحوارات</h3>
-        <ul class="hist" id="memHist"></ul>
+      <div id="pairMsg" class="hint"></div>
+    </section>
+
+    <!-- النموذج -->
+    <section class="card" id="modelCard">
+      <h3><span class="ic">🧠</span> النموذج</h3>
+      <select id="modelSelect"></select>
+      <div id="modelMeta" class="meta">
+        <div class="caps">
+          <span class="no">✗ تفكير</span>
+          <span class="no">✗ أدوات</span>
+          <span class="no">✗ رؤية</span>
+        </div>
+        <div>الحالة: <span class="dot red"></span> —</div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- ============================ DEVICES ============================ -->
-  <section id="tab-devices" class="tab">
-    <h2 class="pagetitle">الأجهزة <small>اقتران جديد أو إدارة الأجهزة المتصلة</small></h2>
-    <div class="card paircard">
-      <h3>🔗 اقتران هاتف جديد</h3>
-      <ol class="stepsmini">
-        <li>في التطبيق: اضغط <b>Connect</b> بعد وضع رابط الخادم</li>
-        <li>سيظهر لك رمز من 6 أرقام — أدخله هنا</li>
-      </ol>
-      <div class="pinrow">
-        <input id="pin" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="one-time-code">
-        <button class="primary" id="btnPair">اقتران</button>
+    <!-- الذاكرة -->
+    <section class="card" id="memCard">
+      <h3><span class="ic">💾</span> الذاكرة</h3>
+      <div id="memSummary" class="mem-summary hint">اختر جهازاً لعرض ذاكرته…</div>
+      <div id="memFacts" class="mem-facts"></div>
+      <div class="row mem-add">
+        <input id="memKey"  placeholder="الاسم (مثال: حساب_tiktok)" maxlength="60" />
+        <input id="memValue" placeholder="القيمة" maxlength="400" />
+        <button id="btnSaveFact" class="ghost">حفظ</button>
       </div>
-      <p class="hint" id="pairHint"></p>
-    </div>
-    <div class="cards" id="deviceCards"></div>
-  </section>
+    </section>
 
-  <!-- ============================ SETTINGS ============================ -->
-  <section id="tab-settings" class="tab">
-    <h2 class="pagetitle">الإعدادات <small>المحرك · الأدوات · ADB</small></h2>
-    <div class="card">
-      <h3>⚡ محرك Aiminos</h3>
-      <div class="cards models" id="modelCards"></div>
-    </div>
-    <div class="card">
-      <h3>🛠️ وضع ADB (اختياري — تحكم أعمق)</h3>
-      <p class="hint">يفكّ ADB قيود الإتاحة: نقرات وإدخال نص يعملان حتى داخل التطبيقات العنيدة.</p>
-      <ol class="stepsmini">
-        <li>وصّل الهاتف بحاسوب مرة واحدة وفعّل <b>خيارات المطور ← تصحيح USB</b></li>
-        <li>من الحاسوب: <code>adb tcpip 5555</code></li>
-        <li>افصل الكابل — ثم في التطبيق: <b>الإعدادات ← ADB ← تشغيل</b></li>
-        <li>وافق على نافذة التفويض التي ستظهر على الهاتف</li>
-      </ol>
-      <p class="hint">بدون ADB كل شيء يعمل عبر خدمة الإتاحة — ADB طبقة إضافية فقط.</p>
-    </div>
-    <div class="card">
-      <h3>ℹ️ حول</h3>
-      <p class="hint">Aiminos v2 · عقل مدبّر + فريق وكلاء + ذاكرة ثلاثية · مجاني 100% عبر Cloudflare</p>
-    </div>
-  </section>
+    <!-- المحادثة -->
+    <section class="card chat" id="chatCard">
+      <div class="chat-head">
+        <h3><span class="ic">💬</span> المحادثة <span id="agentName" class="agent-tag"></span></h3>
+        <button id="btnStop" class="danger" title="إيقاف المهمة الجارية" hidden>⏹ إيقاف</button>
+      </div>
+      <div id="messages" class="messages"><div class="empty">اقترن جهازك، اختر نموذجاً، ثم أرسل أمراً مثل: <b>افتح TikTok وانتقل للفيديو التالي</b></div></div>
+      <form id="chatForm">
+        <button type="button" id="btnMic" class="mic" title="تحدّث — يُحوَّل صوتك إلى نص ويُرسل">🎤</button>
+        <input id="chatInput" placeholder="اكتب أمراً… أو اضغط المايك وتحدّث" autocomplete="off" />
+        <button class="primary" id="btnSend" type="submit">إرسال</button>
+      </form>
+    </section>
 
-  <!-- ============================ LOGS ============================ -->
-  <section id="tab-logs" class="tab">
-    <h2 class="pagetitle">سجل النظام <small>مباشر</small></h2>
-    <pre class="logview" id="logView">…</pre>
-  </section>
+    <!-- السجل الحي -->
+    <section class="card log" id="logCard">
+      <h3><span class="ic">📡</span> السجل الحي</h3>
+      <div id="liveLog" class="livelog"></div>
+    </section>
+  </main>
 
-</main>
-
-<script src="app.js"></script>
+  <footer>aMiNo — وكيل الأندرويد الذكي · Cloudflare Workers AI <span id="health"></span></footer>
+  <script src="/app.js"></script>
 </body>
 </html>

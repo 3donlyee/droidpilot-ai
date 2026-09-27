@@ -1,10 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- aMiNo mark: molecular hexagon — one mind, five connected specialists -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
+    <!-- hexagon shell -->
+    <path
+        android:pathData="M12,2 L21,7.2 L21,16.8 L12,22 L3,16.8 L3,7.2 Z"
+        android:strokeColor="#22D3EE"
+        android:strokeWidth="1.6" />
+    <!-- spokes to specialists -->
+    <path
+        android:pathData="M12,12 L12,6.5 M12,12 L16.8,14.5 M12,12 L7.2,14.5"
+        android:strokeColor="#A78BFA"
+        android:strokeWidth="1" />
+    <!-- central mind node -->
     <path
         android:fillColor="#22D3EE"
-        android:pathData="M12,2L4.5,20.29l0.71,0.71L12,18l6.79,3l0.71,-0.71L12,2z" />
+        android:pathData="M10,12 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0 Z" />
+    <!-- satellite specialist nodes -->
+    <path
+        android:fillColor="#A78BFA"
+        android:pathData="M10.8,6.5 a1.2,1.2 0 1,0 2.4,0 a1.2,1.2 0 1,0 -2.4,0 Z" />
+    <path
+        android:fillColor="#A78BFA"
+        android:pathData="M15.6,14.5 a1.2,1.2 0 1,0 2.4,0 a1.2,1.2 0 1,0 -2.4,0 Z" />
+    <path
+        android:fillColor="#A78BFA"
+        android:pathData="M6,14.5 a1.2,1.2 0 1,0 2.4,0 a1.2,1.2 0 1,0 -2.4,0 Z" />
 </vector>

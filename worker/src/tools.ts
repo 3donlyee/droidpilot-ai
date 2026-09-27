@@ -41,8 +41,8 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
     },
     ["command"]
   ),
-  // --- Aiminos memory tools (execute SERVER-SIDE — never dispatched to the device) ---
-  f("memory_save", "Save a durable fact about the user into Aiminos long-term memory (T3). Use whenever the user says 'تذكر/احفظ' or shares a lasting preference.", { key: { type: "string", description: "short fact name, e.g. 'حساب_tiktok' or 'لغة_مفضلة'" }, value: { type: "string", description: "the fact itself" } }, ["key", "value"]),
-  f("memory_list", "List everything currently stored in Aiminos long-term memory for this device.", {}),
+  // --- aMiNo memory tools (execute SERVER-SIDE — never dispatched to the device) ---
+  f("memory_save", "Save a durable fact about the user into aMiNo long-term memory (T3). Use whenever the user says 'تذكر/احفظ' or shares a lasting preference.", { key: { type: "string", description: "short fact name, e.g. 'حساب_tiktok' or 'لغة_مفضلة'" }, value: { type: "string", description: "the fact itself" } }, ["key", "value"]),
+  f("memory_list", "List everything currently stored in aMiNo long-term memory for this device.", {}),
   f("memory_forget", "Delete one fact from long-term memory by its key.", { key: { type: "string" } }, ["key"]),
 ];

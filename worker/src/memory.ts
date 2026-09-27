@@ -1,7 +1,7 @@
 /**
  * AIMINOS MEMORY PROTOCOLS
  * ========================
- * Three-tier memory (the "Aiminos Mind"):
+ * Three-tier memory (the "aMiNo Mind"):
  *   T1 context    → system prompt + agent persona (per turn, ephemeral)
  *   T2 session    → rolling verbatim history (last 8 exchanges) injected each turn
  *   T3 durable    → named facts the user/agents explicitly saved (memory_save)
@@ -75,7 +75,7 @@ export async function loadSummary(env: Env, deviceId: string): Promise<string> {
 
 async function refreshSummary(env: Env, deviceId: string, hist: HistItem[]): Promise<void> {
   try {
-    const convo = hist.map((h) => `${h.role === "user" ? "المستخدم" : "Aiminos"}: ${h.text}`).join("\n");
+    const convo = hist.map((h) => `${h.role === "user" ? "المستخدم" : "aMiNo"}: ${h.text}`).join("\n");
     const model = defaultModel();
     const provider = getProvider(env, model.id);
     const r = await provider.chat(model.id, [

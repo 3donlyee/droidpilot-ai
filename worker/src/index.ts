@@ -33,7 +33,7 @@ async function handleApi(req: Request, env: Env, ctx: ExecutionContext, path: st
 
   // ---------------------------------------------------------- public reads
   if (method === "GET" && path === "/api/health") {
-    return json({ ok: true, service: "aiminos", time: Date.now() });
+    return json({ ok: true, service: "amino", time: Date.now() });
   }
   if (method === "GET" && path === "/api/models") {
     return json({ ok: true, models: publicModels() });
@@ -104,7 +104,7 @@ async function handleApi(req: Request, env: Env, ctx: ExecutionContext, path: st
     return startTurn(env, ctx, deviceId, message, body?.model_id ?? null, body?.agent_id ?? null, body?.source ?? null);
   }
 
-  // ------------------------------------------------- aiminos: stop / memory
+  // ------------------------------------------------- aMiNo: stop / memory
   if (method === "POST" && path === "/api/turn/stop") {
     const body = await readJson(req);
     const deviceId = String(body?.device_id ?? "");

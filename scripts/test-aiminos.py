@@ -90,7 +90,7 @@ def main():
         print("register FAILED:", r); sys.exit(1)
     dev, sec, pin = r["device_id"], r["device_secret"], r["pairing_code"]
     H = {"x-device-id": dev, "x-device-secret": sec}
-    check("device id prefix AIM-", dev.startswith("AIM-"), dev)
+    check("device id prefix DROID-", dev.startswith("DROID-"), dev)
     pr = req("POST", "/api/pair/confirm", {"device_id": dev, "pairing_code": pin})
     check("pairing", bool(pr and pr.get("ok")))
     print(f"  (device {dev})")

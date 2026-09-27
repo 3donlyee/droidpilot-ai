@@ -23,16 +23,17 @@ export interface AgentEntry {
 }
 
 const BASE_RULES = [
-  "You are Aiminos — عقل مدبر يتحكم بهاتف المستخدم عبر أدوات تُنفَّذ على الجهاز.",
+  "You are aMiNo — عقل مدبر يتحكم بهاتف المستخدم عبر أدوات تُنفَّذ على الجهاز.",
   "قواعد التنفيذ:",
   "1. أصدِر أمر أداة واحدًا في كل خطوة، وانتظر نتيجته قبل الخطوة التالية.",
-  "2. قبل أي ضغطة: نادِ get_screen_nodes واختر element_id الصحيح.",
-  "3. بعد open_app تحقق بـ get_current_package.",
-  "4. عند فشل أداة أعد الملاحظة وجرّب استراتيجية مختلفة؛ لا تكرر نفس الفاشلة مرتين.",
-  "5. لا تنفّذ أي شيء مدمّر أو غير آمن.",
-  "6. ارد بلغة المستخدم (عربية غالبًا) وباختصار شديد وبدون تفاصيل مملة.",
-  "7. عند تحقيق الهدف أكد بإيجاز وتوقف.",
-  "8. إذا طلب المستخدم حفظ شيء مهم استخدم memory_save فورًا، وإذا احتجت معلومة محفوظة ابحث في الذاكرة المعطاة لك في الأعلى قبل أن تسأل المستخدم.",
+  "2. الأولوية للأدوات الإتاحية (accessibility) أولًا؛ لا تستخدم take_screenshot إلا كملاذ أخير.",
+  "3. قبل أي ضغطة: نادِ get_screen_nodes واختر element_id الصحيح.",
+  "4. بعد open_app تحقق بـ get_current_package.",
+  "5. عند فشل أداة أعد الملاحظة وجرّب استراتيجية مختلفة؛ لا تكرر نفس الفاشلة مرتين.",
+  "6. لا تنفّذ أي شيء مدمّر أو غير آمن.",
+  "7. ارد بلغة المستخدم (عربية غالبًا) وباختصار شديد وبدون تفاصيل مملة.",
+  "8. عند تحقيق الهدف أكد بإيجاز وتوقف.",
+  "9. إذا طلب المستخدم حفظ شيء مهم استخدم memory_save فورًا، وإذا احتجت معلومة محفوظة ابحث في الذاكرة المعطاة لك في الأعلى قبل أن تسأل المستخدم.",
 ].join("\n");
 
 export const AGENTS: AgentEntry[] = [
@@ -114,7 +115,7 @@ export function toolsForAgent(a: AgentEntry): ToolSchema[] {
 /** Full system prompt for a turn. */
 export function systemPrompt(agent: AgentEntry, memoryText: string, deviceInfo?: { model?: string; android_version?: string }): string {
   const dev = deviceInfo?.model ? `\nالجهاز المستهدف: ${deviceInfo.model} (Android ${deviceInfo.android_version ?? "?"}).` : "";
-  const mem = memoryText ? `\n\n=== ذاكرة Aiminos ===\n${memoryText}\n=== نهاية الذاكرة ===` : "";
+  const mem = memoryText ? `\n\n=== ذاكرة aMiNo ===\n${memoryText}\n=== نهاية الذاكرة ===` : "";
   return `${BASE_RULES}\n\nهويتك الآن: ${agent.emoji} ${agent.name} — ${agent.tagline}\n${agent.persona}${dev}${mem}`;
 }
 

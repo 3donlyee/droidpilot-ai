@@ -1,15 +1,18 @@
-// DroidPilot AI — Cloudflare Worker configuration.
+// aMiNo — Cloudflare Worker configuration.
 //
 // IMPORTANT (security): no secrets live in this file or anywhere in the repo.
-//   - DEVICE_AUTH_SECRET   → `wrangler secret put DEVICE_AUTH_SECRET`
-//   - OPENAI_API_KEY       → only if you enable the "openai-compat" provider
-// The KV namespace ids below are account-specific but are NOT secrets
-// (standard wrangler practice). For a fresh Cloudflare account, either delete
-// them and run scripts/deploy-cloudflare.sh (auto-creates + injects), or run:
-//   wrangler kv namespace create KV_DEVICES   (…and the other three)
+//   - DEVICE_AUTH_SECRET   → `wrangler secret put DEVICE_AUTH_SECRET` (ALREADY
+//     set on the live worker — never re-put it, existing pairing would survive
+//     but keep it stable anyway).
+//
+// CRITICAL (continuity): this worker IS the user's live deployment
+// (https://droidpilot-ai.droidpilot.workers.dev). The KV namespace ids below
+// are the LIVE ones (fetched from the running worker's bindings) — his real
+// phone is registered in KV_DEVICES. Do NOT swap these for fresh namespaces:
+// that would silently unpair every device.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "aiminos",
+  "name": "droidpilot-ai",
   "main": "src/index.ts",
   "compatibility_date": "2025-08-01",
 
@@ -25,10 +28,10 @@
   },
 
   "kv_namespaces": [
-    { "binding": "KV_DEVICES", "id": "207ce78675a24f3cbdaafd8ffd488469" },
-    { "binding": "KV_TURNS",   "id": "8e1cafba93e0462dbcdc53102fe645cb" },
-    { "binding": "KV_RATE",    "id": "c0aea6e5f61a44398463c4b443151f77" },
-    { "binding": "KV_LOGS",    "id": "21b56f97b0e8473e8b04b611302281fa" }
+    { "binding": "KV_DEVICES", "id": "267f399b66a449bab43173e5380d6025" },
+    { "binding": "KV_TURNS",   "id": "eec3ca361cfb4c0ab6f3ec0b1b270e54" },
+    { "binding": "KV_RATE",    "id": "d77ced2c33004a7b94975c622811050a" },
+    { "binding": "KV_LOGS",    "id": "f92f3218dda04ed2811a18e1a2007ca6" }
   ],
 
   "vars": {
