@@ -1,5 +1,6 @@
 package ai.droidpilot.app.adb
 
+import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Arrays
 import javax.crypto.Mac
