@@ -113,7 +113,7 @@ internal object Ed25519 {
         val lhs = X.multiply(X).negate().add(Y.multiply(Y)).mod(P)
         val rhs = BigInteger.ONE
             .add(D.multiply(X).multiply(X).mod(P).multiply(Y).multiply(Y)).mod(P)
-        if (lhs != rhs) return null
+        if (lhs.compareTo(rhs) != 0) return null
         return Pt(X, Y, Z, T)
     }
 
