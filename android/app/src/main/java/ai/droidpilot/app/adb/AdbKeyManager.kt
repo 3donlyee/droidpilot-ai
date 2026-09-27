@@ -32,6 +32,11 @@ import javax.net.ssl.SSLEngine
 import javax.net.ssl.X509ExtendedKeyManager
 import javax.net.ssl.X509ExtendedTrustManager
 
+/** AOSP adb pubkey constants (packages/modules/adb crypto pubkey.h) for 2048-bit keys. */
+internal const val ANDROID_PUBKEY_MODULUS_SIZE = 2048 / 8 // 256 bytes
+internal const val ANDROID_PUBKEY_MODULUS_SIZE_WORDS = ANDROID_PUBKEY_MODULUS_SIZE / 4 // 64 words
+internal const val RSAPublicKey_Size = 4 + 4 + ANDROID_PUBKEY_MODULUS_SIZE_WORDS * 4 * 2 + 4 // 524 bytes: len+n0inv+n+rr+e
+
 /**
  * ADB RSA key + self-signed X509 certificate + TLS 1.3 context.
  * Port of Shizuku's AdbKey (Apache-2.0), adapted to store the RSA key in
