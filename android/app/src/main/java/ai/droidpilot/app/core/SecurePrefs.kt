@@ -58,6 +58,21 @@ class SecurePrefs(context: Context) {
         get() = prefs.getBoolean("adb_enabled", false)
         set(v) = prefs.edit().putBoolean("adb_enabled", v).apply()
 
+    /** Wireless ADB paired successfully via the in-app pairing flow. */
+    var adbPaired: Boolean
+        get() = prefs.getBoolean("adb_paired", false)
+        set(v) = prefs.edit().putBoolean("adb_paired", v).apply()
+
+    /** Verified ADB TLS endpoint "ip:port" (connection port, changes per toggle). */
+    var adbConnectEndpoint: String?
+        get() = prefs.getString("adb_connect_endpoint", null)
+        set(v) = prefs.edit().putString("adb_connect_endpoint", v).apply()
+
+    /** Last seen pairing port (informational). */
+    var adbLastPairPort: Int
+        get() = prefs.getInt("adb_last_pair_port", -1)
+        set(v) = prefs.edit().putInt("adb_last_pair_port", v).apply()
+
     /** RSA-2048 keypair for ADB auth (PKCS8 private, X509 public, Base64). */
     var adbKeyPriv: String?
         get() = prefs.getString("adb_key_priv", null)

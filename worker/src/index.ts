@@ -36,7 +36,7 @@ async function handleApi(req: Request, env: Env, ctx: ExecutionContext, path: st
     return json({ ok: true, service: "amino", time: Date.now() });
   }
   if (method === "GET" && path === "/api/models") {
-    return json({ ok: true, models: publicModels() });
+    return json({ ok: true, models: publicModels(env) });
   }
   if (method === "GET" && path === "/api/agents") {
     return json({ ok: true, agents: publicAgents() });

@@ -99,7 +99,7 @@ async function refreshModels() {
     for (const m of models) {
       const o = document.createElement("option");
       o.value = m.id;
-      o.textContent = m.displayName + (m.default ? "  (افتراضي)" : "");
+      o.textContent = m.displayName + (m.default ? "  (افتراضي)" : "") + (m.status === "needs-key" ? "  — يحتاج مفتاح" : "");
       if (m.status !== "available") o.disabled = true;
       sel.appendChild(o);
     }
@@ -122,7 +122,9 @@ function renderCapabilities(m) {
       <span class="${m.capabilities.supportsTools ? "ok" : "no"}">${m.capabilities.supportsTools ? "✓" : "✗"} أدوات</span>
       <span class="${m.capabilities.supportsVision ? "ok" : "no"}">${m.capabilities.supportsVision ? "✓" : "✗"} رؤية</span>
     </div>
-    <div>الحالة: <span class="dot ${m.status === "available" ? "green" : "red"}"></span> ${esc(m.status)}</div>`;
+    <div>الحالة: <span class="dot ${m.status === "available" ? "green" : "red"}"></span> ${
+        m.status === "needs-key" ? "يتطلب مفتاح OpenRouter (مجاني)" : esc(m.status)
+      }</div>`;
 }
 
 /* ------------------------------------------------------------------ team */

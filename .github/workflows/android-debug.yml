@@ -23,12 +23,15 @@ jobs:
         with:
           gradle-version: "8.9"
 
+      - name: Run JVM unit tests (pairing crypto vectors)
+        run: gradle -p android :app:testDebugUnitTest --no-daemon
+
       - name: Build debug APK
         run: gradle -p android :app:assembleDebug --no-daemon
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Aiminos-debug-apk
+          name: aMiNo-debug-apk
           path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error

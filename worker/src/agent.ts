@@ -1,7 +1,7 @@
 import type { Env } from "./env";
 import type { Turn, Command, DeviceResult } from "./types";
 import { json, randomId, now, safeJsonParse } from "./util";
-import { getProvider } from "./ai/provider";
+import { chatWithFailover } from "./ai/provider";
 import { getModel, defaultModel } from "./models";
 import { audit } from "./audit";
 import { getAgent, pickAgent, toolsForAgent, systemPrompt as agentSystemPrompt, AgentEntry } from "./agents";
@@ -48,7 +48,7 @@ export async function startTurn(
   agentId?: string | null,
   source?: string | null
 ): Promise<Response> {
-  const model = (modelId && getModel(modelId)) || defaultModel();
+  const model = (modelId && getModel(modelId)) || defaultModel(env);
   if (!model.supportsTools) {
     return json({ ok: false, error: "MODEL_NO_TOOLS", hint: "Pick a model with Tool Calling enabled" }, 400);
   }
@@ -135,8 +135,7 @@ export async function agentStep(env: Env, ctx: ExecutionContext, turnId: string)
   }
 
   try {
-    const provider = getProvider(env, turn.model_id);
-    const result = await provider.chat(turn.model_id, turn.messages, toolsForAgent(agent));
+    const result = await chatWithFailover(env, turn.model_id, turn.messages, toolsForAgent(agent));
 
     if (result.toolCalls.length > 0) {
       const tc = result.toolCalls[0]; // one command at a time
@@ -192,9 +191,24 @@ export async function agentStep(env: Env, ctx: ExecutionContext, turnId: string)
       await finishTurn(env, ctx, turn, result.text ?? "(empty response)");
     }
   } catch (e: any) {
-    turn.steps.push({ ts: now(), type: "error", text: `AI_ERROR: ${String(e?.message ?? e).slice(0, 800)}` });
+    const raw = String(e?.message ?? e);
+    turn.steps.push({ ts: now(), type: "error", text: `AI_ERROR: ${raw.slice(0, 800)}` });
+
+    // Cloudflare free-tier Neuron quota exhausted (4006) → answer in clean
+    // Arabic instead of a raw English error. OpenRouter models (once the key
+    // secret exists) bypass this entirely via the failover chain.
+    if (/4006|neurons|daily free allocation/i.test(raw)) {
+      const msg =
+        "⚠️ نفدت الحصة اليومية المجانية لسحابة Cloudflare (10,000 Neuron/يوم).\n" +
+        "تتجدد الحصة تلقائيًا عند منتصف الليل UTC (01:00 بتوقيت الجزائر).\n" +
+        "للتجاوز الفوري: أضف مفتاح OpenRouter المجاني ليصبح aMiNo يعمل عبر نماذج OpenRouter المجانية أولًا.";
+      await finishTurn(env, ctx, turn, msg, "stopped");
+      await audit(env, "turn_quota", { turn: turnId, device: turn.device_id });
+      return;
+    }
+
     turn.state = "error";
-    turn.error = String(e?.message ?? e).slice(0, 800);
+    turn.error = raw.slice(0, 800);
     await saveTurn(env, turn);
     await clearDeviceTurn(env, turn.device_id);
     await audit(env, "turn_error", { turn: turnId, device: turn.device_id, error: turn.error });

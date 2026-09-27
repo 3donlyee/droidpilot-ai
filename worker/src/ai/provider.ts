@@ -1,6 +1,6 @@
 import type { AIProvider, AIChatResult, ChatMessage, ToolSchema } from "../types";
 import type { Env } from "../env";
-import { getModel } from "../models";
+import { getModel, defaultModel, MODELS } from "../models";
 import { WorkersAIProvider } from "./workers-ai";
 import { OpenAICompatProvider } from "./openai-compat";
 
@@ -24,6 +24,42 @@ export function getProvider(env: Env, modelId?: string): AIProvider {
     return new OpenAICompatProvider(env);
   }
   return new WorkersAIProvider(env);
+}
+
+/**
+ * FAILOVER CHAIN — keeps aMiNo answering even when one provider is exhausted:
+ *   requested model → other usable OpenRouter free models → Workers AI models.
+ * Throws the LAST error only when every candidate failed.
+ */
+export async function chatWithFailover(
+  env: Env,
+  modelId: string | undefined,
+  messages: ChatMessage[],
+  tools: ToolSchema[]
+): Promise<AIChatResult> {
+  const primary = (modelId && getModel(modelId) && modelId) || defaultModel(env).id;
+  const candidates: string[] = [primary];
+
+  for (const m of MODELS) {
+    if (m.id === primary || !m.enabled) continue;
+    if (m.requiresKey && !env.OPENAI_API_KEY) continue;
+    candidates.push(m.id);
+  }
+
+  let lastErr: any;
+  for (const id of candidates) {
+    try {
+      const provider = getProvider(env, id);
+      const result = await provider.chat(id, messages, tools);
+      if (id !== primary) {
+        result.style = `${result.style ?? ""}|failover→${id}`;
+      }
+      return result;
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr;
 }
 
 export type { AIProvider, AIChatResult, ChatMessage, ToolSchema };

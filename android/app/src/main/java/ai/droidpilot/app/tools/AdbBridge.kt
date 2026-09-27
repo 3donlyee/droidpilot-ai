@@ -1,7 +1,10 @@
 package ai.droidpilot.app.tools
 
+import android.os.Build
 import android.content.Context
 import android.provider.Settings
+import ai.droidpilot.app.adb.AdbKeyManager
+import ai.droidpilot.app.adb.AdbTlsClient
 import ai.droidpilot.app.core.LogSystem
 import ai.droidpilot.app.core.SecurePrefs
 import java.io.IOException
@@ -10,18 +13,18 @@ import java.security.SecureRandom
 import java.util.Base64
 
 /**
- * Aiminos ADB bridge — optional deep-control layer.
+ * aMiNo ADB bridge — optional deep-control layer.
  *
- * When the user enables ADB mode (one-time PC setup: `adb tcpip 5555`), tools
- * gain a powerful fallback: `input tap/swipe/text` work even where the
- * accessibility tree cannot reach. Without ADB everything still works through
- * the accessibility service — this bridge is strictly additive.
+ * Routing (strictly additive — accessibility tools keep working without it):
+ *   1. Wireless ADB TLS (preferred): paired in-app via AdbPairingService —
+ *      real SPAKE2+TLS pairing, connection on the mDNS-discovered port.
+ *   2. Legacy TCP:5555 (requires one-time `adb tcpip 5555` from a PC).
  */
 class AdbBridge(private val context: Context) {
 
     private val prefs by lazy { SecurePrefs(context) }
 
-    /** Whether wireless/TCP debugging is enabled in system settings (informational). */
+    /** Whether wireless debugging is enabled in system settings (informational). */
     fun wirelessDebuggingEnabled(): Boolean = try {
         Settings.Global.getInt(context.contentResolver, "adb_wifi_enabled") == 1
     } catch (_: Exception) {
@@ -36,6 +39,26 @@ class AdbBridge(private val context: Context) {
      * not listening, or not yet authorized.
      */
     fun exec(command: String): Pair<Int, String> {
+        // 1. Wireless TLS path (Android 11+, paired via the in-app flow)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && prefs.adbPaired) {
+            val endpoint = prefs.adbConnectEndpoint
+            if (!endpoint.isNullOrBlank()) {
+                try {
+                    val key = AdbKeyManager.load(prefs)
+                    val idx = endpoint.lastIndexOf(':')
+                    if (idx > 0) {
+                        val host = endpoint.substring(0, idx)
+                        val port = endpoint.substring(idx + 1).toInt()
+                        val out = AdbTlsClient.runShell(host, port, key, command)
+                        LogSystem.log("adb", "tls exec ok: ${command.take(40)} -> ${out.take(60)}")
+                        return 0 to out
+                    }
+                } catch (t: Throwable) {
+                    LogSystem.log("adb", "tls exec failed (${t.message}); falling back to legacy")
+                }
+            }
+        }
+        // 2. Legacy classic path (TCP 5555, PC setup)
         val c = AdbClient.connect(prefs)
         try {
             val out = c.shell(command)

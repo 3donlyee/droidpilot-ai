@@ -54,8 +54,8 @@ export class OpenAICompatProvider implements AIProvider {
     };
     // OpenRouter app attribution (optional but recommended by their docs).
     if (/openrouter\.ai/.test(baseUrl)) {
-      headers["HTTP-Referer"] = this.env.OPENROUTER_SITE_URL ?? "https://droidpilot-ai.turkjgastroenterol-org.workers.dev";
-      headers["X-Title"] = this.env.OPENROUTER_SITE_NAME ?? "DroidPilot AI";
+      headers["HTTP-Referer"] = this.env.OPENROUTER_SITE_URL ?? "https://droidpilot-ai.droidpilot.workers.dev";
+      headers["X-Title"] = this.env.OPENROUTER_SITE_NAME ?? "aMiNo";
     }
 
     const res = await fetch(`${baseUrl}/chat/completions`, {
@@ -68,9 +68,9 @@ export class OpenAICompatProvider implements AIProvider {
       const text = await res.text();
       // Some models (e.g. OpenAI via OpenRouter) are region-blocked depending on
       // which Cloudflare colo egresses the request. Retry once with the regional
-      // fallback model so the agent keeps working from anywhere.
+      // fallback model (set OPENAI_REGION_FALLBACK var) so the agent keeps working.
       if (res.status === 403 && /not available in your region/i.test(text)) {
-        const fb = this.env.OPENAI_REGION_FALLBACK || "meta-llama/llama-3.3-70b-instruct";
+        const fb = this.env.OPENAI_REGION_FALLBACK;
         if (fb && fb !== modelId) {
           const retry = await fetch(`${baseUrl}/chat/completions`, {
             method: "POST",

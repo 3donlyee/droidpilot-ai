@@ -2,7 +2,10 @@ package ai.droidpilot.app
 
 import android.Manifest
 import android.accessibilityservice.AccessibilityServiceInfo
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -45,6 +48,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvLog: TextView
 
     private val handler = Handler(Looper.getMainLooper())
+    private lateinit var tvAdb: TextView
     private val ticker = object : Runnable {
         override fun run() {
             refreshStatus()
@@ -77,21 +81,29 @@ class MainActivity : AppCompatActivity() {
 
         addAdbRow()
         requestPermissions()
+
+        androidx.core.content.ContextCompat.registerReceiver(
+            this,
+            adbStateReceiver,
+            IntentFilter(ai.droidpilot.app.adb.AdbPairingService.BROADCAST_STATE),
+            androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED
+        )
     }
 
-    /** ADB deep-control toggle (opt-in). See Web UI → الإعدادات for setup steps. */
+    /** ADB deep-control toggle + REAL wireless pairing button. */
     private fun addAdbRow() {
         try {
             val content = findViewById<android.view.ViewGroup>(android.R.id.content)
             val scroll = content.getChildAt(0) as? android.widget.ScrollView ?: return
             val root = scroll.getChildAt(0) as? LinearLayout ?: return
+
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 setPadding(8, 8, 8, 8)
                 gravity = android.view.Gravity.CENTER_VERTICAL
             }
             val cb = CheckBox(this).apply {
-                text = "وضع ADB — تحكم أعمق (يتطلب إعدادًا واحدًا من الحاسوب)"
+                text = "وضع ADB — تحكم أعمق"
                 textSize = 13f
                 isChecked = prefs.adbEnabled
                 setOnCheckedChangeListener { _, v ->
@@ -101,8 +113,65 @@ class MainActivity : AppCompatActivity() {
             }
             row.addView(cb)
             root.addView(row)
+
+            val pairBtn = Button(this).apply {
+                text = "بدء اقتران ADB"
+                textSize = 14f
+                setOnClickListener { startAdbPairing() }
+            }
+            val pairRow = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(8, 0, 8, 8)
+                gravity = android.view.Gravity.CENTER_VERTICAL
+            }
+            pairRow.addView(pairBtn)
+            tvAdb = TextView(this).apply {
+                textSize = 13f
+                setPadding(16, 0, 16, 0)
+                text = adbStatusText()
+            }
+            pairRow.addView(tvAdb)
+            root.addView(pairRow)
         } catch (_: Throwable) {
             // cosmetic only — never break app startup
+        }
+    }
+
+    private fun adbStatusText(): String = when {
+        prefs.adbPaired && !prefs.adbConnectEndpoint.isNullOrBlank() ->
+            "● ADB متصل (${prefs.adbConnectEndpoint})"
+        prefs.adbPaired -> "✔ ADB مقترن — بانتظار منفذ الاتصال"
+        else -> "○ ADB غير مقترن"
+    }
+
+    /** Real wireless ADB pairing — user stays on the Wireless debugging screen. */
+    private fun startAdbPairing() {
+        if (Build.VERSION.SDK_INT < 30) {
+            toast("اقتران Wireless ADB يتطلب Android 11 أو أحدث")
+            return
+        }
+        LogSystem.log("adb", "user requested ADB pairing")
+        val intent = Intent(this, ai.droidpilot.app.adb.AdbPairingService::class.java)
+            .setAction(ai.droidpilot.app.adb.AdbPairingService.ACTION_START)
+        ContextCompat.startForegroundService(this, intent)
+        toast("افتح: الإعدادات ← خيارات المطورين ← التصحيح اللاسلكي ← اقتران الجهاز برمز")
+    }
+
+    private val adbStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action != ai.droidpilot.app.adb.AdbPairingService.BROADCAST_STATE) return
+            val state = intent.getStringExtra(ai.droidpilot.app.adb.AdbPairingService.EXTRA_STATE) ?: return
+            val message = intent.getStringExtra(ai.droidpilot.app.adb.AdbPairingService.EXTRA_MESSAGE) ?: ""
+            if (this@MainActivity::tvAdb.isInitialized) {
+                tvAdb.text = when (state) {
+                    ai.droidpilot.app.adb.AdbPairingService.STATE_CONNECTED -> adbStatusText()
+                    ai.droidpilot.app.adb.AdbPairingService.STATE_PAIRED -> "✔ ADB مقترن — بانتظار منفذ الاتصال"
+                    ai.droidpilot.app.adb.AdbPairingService.STATE_WAITING -> "⟳ $message"
+                    ai.droidpilot.app.adb.AdbPairingService.STATE_PAIRING -> "⟳ $message"
+                    ai.droidpilot.app.adb.AdbPairingService.STATE_FAILED -> "✖ $message"
+                    else -> tvAdb.text
+                }
+            }
         }
     }
 

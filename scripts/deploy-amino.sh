@@ -62,6 +62,14 @@ fi
 echo "==> 5. wrangler deploy (in-place upgrade)"
 CLOUDFLARE_API_TOKEN="$TOK" npx wrangler deploy 2>&1 | grep -E "Uploaded|Deployed|Version|Current Version|error|Error" || true
 
+# Optional: activate OpenRouter free models by piping the key into the secret
+# (OR_KEY env only — never echoed, never stored). When set, aMiNo's default
+# model becomes an OpenRouter :free model and Cloudflare Neurons are preserved.
+if [ -n "${OR_KEY:-}" ]; then
+  echo "==> 5b. set OPENAI_API_KEY secret (OpenRouter key from env, value hidden)"
+  printf '%s' "$OR_KEY" | CLOUDFLARE_API_TOKEN="$TOK" npx wrangler secret put OPENAI_API_KEY 2>&1 | grep -vE "telemetry" | tail -2
+fi
+
 echo "==> 6. wait for version propagation (15s)"; sleep 15
 
 echo "==> 7. verify live endpoints"

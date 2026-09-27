@@ -5,8 +5,10 @@ import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.graphics.Path
 import android.graphics.Rect
+import android.os.Build
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import ai.droidpilot.app.core.LogSystem
 
 /**
@@ -68,6 +70,63 @@ class DroidPilotAccessibilityService : AccessibilityService() {
             // Foreground app changed → previous tree snapshot is no longer valid.
             lastTreeHash = null
         }
+        // aMiNo: while the ADB pairing service waits for a port, scan the
+        // Settings "Pair device with pairing code" dialog for its IP:port.
+        if (adbPairWatching && event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            val p = event.packageName?.toString() ?: ""
+            if (p == "com.android.settings" || p == "com.android.systemui") {
+                scanForPairingEndpoint()
+            }
+        }
+    }
+
+    // ---- aMiNo ADB pairing watcher (zero cost unless the pairing service is live) ----
+
+    @Volatile
+    private var adbPairWatching: Boolean = false
+
+    private var lastEndpointScan: Long = 0
+
+    private val endpointRegex = Regex("\\b(\\d{1,3}(?:\\.\\d{1,3}){3}):(\\d{3,5})\\b")
+
+    private fun scanForPairingEndpoint() {
+        val now = System.currentTimeMillis()
+        if (now - lastEndpointScan < 500) return
+        lastEndpointScan = now
+        try {
+            val listener = ai.droidpilot.app.adb.AdbPairingService.endpointListener ?: run {
+                adbPairWatching = false
+                return
+            }
+            val windows: List<AccessibilityWindowInfo> =
+                if (Build.VERSION.SDK_INT >= 21) this.windows else emptyList()
+            for (w in windows) {
+                val root = w.root ?: continue
+                val found = findEndpointText(root) ?: continue
+                listener(found)
+                return
+            }
+        } catch (_: Throwable) {
+        }
+    }
+
+    private fun findEndpointText(node: AccessibilityNodeInfo?): String? {
+        if (node == null) return null
+        val t = node.text?.toString()
+        if (t != null) {
+            val m = endpointRegex.find(t)
+            if (m != null) return m.value
+        }
+        for (i in 0 until node.childCount) {
+            val found = findEndpointText(node.getChild(i)) ?: continue
+            return found
+        }
+        return null
+    }
+
+    /** Called by AdbPairingService to arm/disarm the cheap dialog watcher. */
+    fun setAdbPairWatching(enabled: Boolean) {
+        adbPairWatching = enabled
     }
 
     override fun onInterrupt() {}

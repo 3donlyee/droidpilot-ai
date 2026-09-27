@@ -11,10 +11,13 @@
  *                             Requires OPENAI_API_KEY secret; OPENAI_BASE_URL is
  *                             a public endpoint (set as a plain var).
  *
- * CURRENT ACTIVE (100% FREE): Cloudflare Workers AI models only — no API keys,
- * no OpenRouter, no paid plans. Workers AI free tier = daily Neuron allocation.
- * Paid/OpenRouter entries are kept disabled for one-flag re-enable later.
- * aMiNo branding: Core (smart), Fast (speed), Vision (screenshots).
+ * TIERING (anti-quota design):
+ *   Tier 1 — OpenRouter :free models (requiresKey). When the user's OpenRouter
+ *           key is set as a secret these activate automatically and take the
+ *           default slot → ZERO Cloudflare Neurons consumed.
+ *   Tier 2 — aMiNo Core/Fast/Vision on Workers AI free tier (fallback when
+ *           OpenRouter rate-limits or the key is absent).
+ *   chatWithFailover() walks this chain automatically per call.
  */
 export interface ModelEntry {
   id: string;
@@ -25,9 +28,43 @@ export interface ModelEntry {
   reasoning: boolean;
   enabled: boolean;
   default?: boolean;
+  /** When true the model only activates if the OPENAI_API_KEY secret exists. */
+  requiresKey?: boolean;
 }
 
 export const MODELS: ModelEntry[] = [
+  // --- Tier 1: OpenRouter FREE models (activate automatically once the key secret exists) ---
+  {
+    id: "nvidia/nemotron-3-super-120b-a12b:free",
+    displayName: "aMiNo Ultra (مجاني عبر OpenRouter)",
+    provider: "openai-compat",
+    supportsTools: true,
+    supportsVision: false,
+    reasoning: false,
+    enabled: true,
+    default: true,
+    requiresKey: true,
+  },
+  {
+    id: "qwen/qwen3.8-27b:free",
+    displayName: "aMiNo عربي (مجاني عبر OpenRouter)",
+    provider: "openai-compat",
+    supportsTools: true,
+    supportsVision: false,
+    reasoning: false,
+    enabled: true,
+    requiresKey: true,
+  },
+  {
+    id: "google/gemma-4-31b-it:free",
+    displayName: "aMiNo Lite (مجاني عبر OpenRouter)",
+    provider: "openai-compat",
+    supportsTools: true,
+    supportsVision: false,
+    reasoning: false,
+    enabled: true,
+    requiresKey: true,
+  },
   {
     // PAID via OpenRouter — user opted out of paid models. One-flag re-enable.
     id: "openai/gpt-4o",
@@ -39,18 +76,7 @@ export const MODELS: ModelEntry[] = [
     enabled: false,
     default: false,
   },
-  {
-    // OpenRouter fallback for gpt-4o — disabled together with it (free tier of
-    // OpenRouter is rate-limited to ~50 req/day; Workers AI is more generous).
-    id: "meta-llama/llama-3.3-70b-instruct",
-    displayName: "Llama 3.3 70B (OpenRouter)",
-    provider: "openai-compat",
-    supportsTools: true,
-    supportsVision: false,
-    reasoning: false,
-    enabled: false,
-  },
-  // --- aMiNo engines (100% FREE — Cloudflare Workers AI, no keys) ---
+  // --- Tier 2: aMiNo engines (100% FREE — Cloudflare Workers AI, no keys) ---
   {
     id: "@cf/openai/gpt-oss-20b",
     displayName: "aMiNo Core",
@@ -59,7 +85,6 @@ export const MODELS: ModelEntry[] = [
     supportsVision: false,
     reasoning: true,
     enabled: true,
-    default: true,
   },
   {
     id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
@@ -85,12 +110,26 @@ export function getModel(id: string): ModelEntry | undefined {
   return MODELS.find((m) => m.id === id);
 }
 
-export function defaultModel(): ModelEntry {
-  return MODELS.find((m) => m.default && m.enabled) ?? MODELS.find((m) => m.enabled)!;
+function keyAvailable(env?: { OPENAI_API_KEY?: string }): boolean {
+  return !!(env && env.OPENAI_API_KEY && env.OPENAI_API_KEY.length > 0);
+}
+
+export function isModelUsable(m: ModelEntry, env?: { OPENAI_API_KEY?: string }): boolean {
+  return m.enabled && (!m.requiresKey || keyAvailable(env));
+}
+
+/**
+ * Default model — key-aware: an OpenRouter free model is the default when the
+ * key secret exists; otherwise aMiNo Core (Workers AI) stays the default.
+ */
+export function defaultModel(env?: { OPENAI_API_KEY?: string }): ModelEntry {
+  const def = MODELS.find((m) => m.default && isModelUsable(m, env));
+  if (def) return def;
+  return MODELS.find((m) => isModelUsable(m, env) && !m.requiresKey) ?? MODELS.find((m) => isModelUsable(m, env))!;
 }
 
 /** Public projection — never leaks internals. */
-export function publicModels(): any[] {
+export function publicModels(env?: { OPENAI_API_KEY?: string }): any[] {
   return MODELS.map((m) => ({
     id: m.id,
     displayName: m.displayName,
@@ -100,7 +139,7 @@ export function publicModels(): any[] {
       supportsTools: m.supportsTools,
       supportsVision: m.supportsVision,
     },
-    status: m.enabled ? "available" : "disabled",
-    default: !!m.default,
+    status: !m.enabled ? "disabled" : m.requiresKey && !keyAvailable(env) ? "needs-key" : "available",
+    default: !!m.default && isModelUsable(m, env),
   }));
 }
