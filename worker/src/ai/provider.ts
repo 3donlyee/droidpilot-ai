@@ -47,6 +47,7 @@ export async function chatWithFailover(
   }
 
   let lastErr: any;
+  const errs: string[] = [];
   for (const id of candidates) {
     try {
       const provider = getProvider(env, id);
@@ -57,9 +58,13 @@ export async function chatWithFailover(
       return result;
     } catch (e) {
       lastErr = e;
+      // Aggregate every candidate's error so the caller can see WHICH providers
+      // failed (e.g. OpenRouter 429 daily quota + Cloudflare 4006 neurons) and
+      // craft an honest Arabic message instead of blaming the wrong provider.
+      errs.push(`[${id}] ${String((e as any)?.message ?? e).slice(0, 300)}`);
     }
   }
-  throw lastErr;
+  throw new Error(errs.join(" || ") || String(lastErr));
 }
 
 export type { AIProvider, AIChatResult, ChatMessage, ToolSchema };

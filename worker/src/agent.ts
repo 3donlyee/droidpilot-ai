@@ -209,14 +209,31 @@ export async function agentStep(env: Env, ctx: ExecutionContext, turnId: string)
     const raw = String(e?.message ?? e);
     turn.steps.push({ ts: now(), type: "error", text: `AI_ERROR: ${raw.slice(0, 800)}` });
 
-    // Cloudflare free-tier Neuron quota exhausted (4006) → answer in clean
-    // Arabic instead of a raw English error. OpenRouter models (once the key
-    // secret exists) bypass this entirely via the failover chain.
-    if (/4006|neurons|daily free allocation/i.test(raw)) {
-      const msg =
-        "⚠️ نفدت الحصة اليومية المجانية لسحابة Cloudflare (10,000 Neuron/يوم).\n" +
-        "تتجدد الحصة تلقائيًا عند منتصف الليل UTC (01:00 بتوقيت الجزائر).\n" +
-        "للتجاوز الفوري: أضف مفتاح OpenRouter المجاني ليصبح aMiNo يعمل عبر نماذج OpenRouter المجانية أولًا.";
+    // Free-tier quota exhaustion → answer in clean Arabic instead of a raw
+    // English error. The aggregated failover error lets us see which providers
+    // actually failed (OpenRouter 429 daily quota, Cloudflare 4006 neurons).
+    const orLimited = /free-models-per-day|AI_HTTP_429|rate limit exceeded/i.test(raw);
+    const cfLimited = /4006|neurons|daily free allocation/i.test(raw);
+    if (orLimited || cfLimited) {
+      let msg: string;
+      if (orLimited && cfLimited) {
+        msg =
+          "⚠️ نفدت الحصتان المجانيتان اليوم للعقل المدبّر:\n" +
+          "• OpenRouter المجاني (50 طلب/يوم) — مفتاحك مضبوط ✅ وسيعمل aMiNo تلقائيًا عبره عند التجديد.\n" +
+          "• Cloudflare (10,000 Neuron/يوم).\n" +
+          "🗓️ تتجدد الحصتان تلقائيًا عند منتصف الليل UTC (01:00 بتوقيت الجزائر).\n" +
+          "💡 للتجاوز الفوري: أضف رصيدًا رمزيًا (10$) في openrouter.ai/credits لترفع حصتك إلى 1000 طلب/يوم.";
+      } else if (orLimited) {
+        msg =
+          "⚠️ نفدت الحصة المجانية اليومية لـ OpenRouter (50 طلب/يوم).\n" +
+          "🗓️ تتجدد تلقائيًا عند منتصف الليل UTC (01:00 بتوقيت الجزائر).\n" +
+          "💡 للتجاوز الفوري: أضف رصيدًا رمزيًا (10$) في openrouter.ai/credits لترفع الحصة إلى 1000 طلب/يوم.";
+      } else {
+        msg =
+          "⚠️ نفدت الحصة اليومية المجانية لسحابة Cloudflare (10,000 Neuron/يوم).\n" +
+          "✅ مفتاح OpenRouter مضبوط: سيعمل aMiNo عبر نماذج OpenRouter المجانية أولًا عند توفرها.\n" +
+          "🗓️ تتجدد الحصة تلقائيًا عند منتصف الليل UTC (01:00 بتوقيت الجزائر).";
+      }
       await finishTurn(env, ctx, turn, msg, "stopped");
       await audit(env, "turn_quota", { turn: turnId, device: turn.device_id });
       return;
