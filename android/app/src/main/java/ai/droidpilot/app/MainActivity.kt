@@ -230,11 +230,14 @@ class MainActivity : AppCompatActivity() {
     private fun openAccessibilitySettings() {
         // FIX: open aMiNo's OWN accessibility page (toggle included) instead of
         // dumping the user into the long general list where it's easy to miss.
+        // Uses the ACTION string literal ("android.settings.ACCESSIBILITY_DETAILS",
+        // API 31+) because the Settings.* constant may not resolve against older
+        // compileSdk targets; on any failure we fall back to the general page.
         try {
             if (Build.VERSION.SDK_INT >= 31) {
                 val cn = ComponentName(packageName,
                     ai.droidpilot.app.access.DroidPilotAccessibilityService::class.java.name)
-                val i = Intent(Settings.ACTION_ACCESSIBILITY_DETAILS_SETTINGS)
+                val i = Intent("android.settings.ACCESSIBILITY_DETAILS")
                 i.putExtra(Intent.EXTRA_COMPONENT_NAME, cn)
                 startActivity(i)
             } else {

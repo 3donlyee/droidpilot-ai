@@ -28,10 +28,10 @@
   },
 
   "kv_namespaces": [
-    { "binding": "KV_DEVICES", "id": "267f399b66a449bab43173e5380d6025" },
-    { "binding": "KV_TURNS",   "id": "eec3ca361cfb4c0ab6f3ec0b1b270e54" },
-    { "binding": "KV_RATE",    "id": "d77ced2c33004a7b94975c622811050a" },
-    { "binding": "KV_LOGS",    "id": "f92f3218dda04ed2811a18e1a2007ca6" }
+    { "binding": "KV_DEVICES", "id": "207ce78675a24f3cbdaafd8ffd488469" },
+    { "binding": "KV_TURNS",   "id": "8e1cafba93e0462dbcdc53102fe645cb" },
+    { "binding": "KV_RATE",    "id": "c0aea6e5f61a44398463c4b443151f77" },
+    { "binding": "KV_LOGS",    "id": "21b56f97b0e8473e8b04b611302281fa" }
   ],
 
   "vars": {
