@@ -196,7 +196,12 @@ export function parseAnyResponse(res: any): { text: string | null; toolCalls: To
     // OpenAI-compat style, just in case
     const msg = res.choices[0]?.message;
     if (msg) {
-      if (typeof msg.content === "string") text = (text ?? "") + msg.content;
+      if (typeof msg.content === "string" && msg.content.length) text = (text ?? "") + msg.content;
+      else if (typeof msg.reasoning === "string" && msg.reasoning.length && !text) {
+        // FIX: reasoning models put their answer in `reasoning` when content
+        // is empty — use it instead of finishing the turn with no text.
+        text = msg.reasoning;
+      }
       (msg.tool_calls ?? []).forEach(pushTC);
     }
   }

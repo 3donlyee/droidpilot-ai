@@ -72,7 +72,13 @@ class DroidPilotAccessibilityService : AccessibilityService() {
         }
         // aMiNo: while the ADB pairing service waits for a port, scan the
         // Settings "Pair device with pairing code" dialog for its IP:port.
-        if (adbPairWatching && event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+        // FIX: also scan TYPE_WINDOW_CONTENT_CHANGED — the dialog often opens
+        // (or refreshes its IP:port text) WITHOUT a window-state transition,
+        // which used to leave the watcher blind when armed too late.
+        if (adbPairWatching &&
+            (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ||
+             event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED)
+        ) {
             val p = event.packageName?.toString() ?: ""
             if (p == "com.android.settings" || p == "com.android.systemui") {
                 scanForPairingEndpoint()
@@ -127,6 +133,12 @@ class DroidPilotAccessibilityService : AccessibilityService() {
     /** Called by AdbPairingService to arm/disarm the cheap dialog watcher. */
     fun setAdbPairWatching(enabled: Boolean) {
         adbPairWatching = enabled
+        // FIX: if the pairing dialog is ALREADY open when we arm the watcher,
+        // no new window event will fire — do one immediate scan of the
+        // current windows instead of waiting forever.
+        if (enabled) {
+            try { scanForPairingEndpoint() } catch (_: Throwable) {}
+        }
     }
 
     override fun onInterrupt() {}

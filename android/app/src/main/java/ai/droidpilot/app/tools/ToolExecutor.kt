@@ -63,7 +63,7 @@ class ToolExecutor(private val context: Context) {
         "type_text" -> typeText(cmd.id, cmd.arguments)
         "take_screenshot" -> screenshot(cmd.id)
         "get_logs" -> getLogs(cmd.id, cmd.arguments)
-        "run_shell" -> runShell(cmd.id, cmd.arguments)
+        "run_shell" -> runShell(cmd.id, cmd.arguments, cmd.approved)
         else -> fail(cmd.id, "UNKNOWN_TOOL", cmd.tool)
     }
 
@@ -362,10 +362,12 @@ class ToolExecutor(private val context: Context) {
         return ok(id, JSONObject().put("lines", arr))
     }
 
-    private fun runShell(id: String, args: JSONObject): JSONObject {
+    private fun runShell(id: String, args: JSONObject, approvedByWorker: Boolean): JSONObject {
         val command = args.optString("command").trim()
         if (command.isEmpty()) return fail(id, "INVALID_ARGUMENT", "command required")
-        val approved = args.optBoolean("approved", false)
+        // FIX: honor the worker-side approval flag too (was reading only the
+        // model's own "approved" argument before).
+        val approved = approvedByWorker || args.optBoolean("approved", false)
 
         return when (CommandValidator.classify(command)) {
             CommandValidator.Policy.BLOCKED ->

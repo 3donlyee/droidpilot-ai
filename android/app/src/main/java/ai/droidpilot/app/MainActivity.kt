@@ -3,6 +3,7 @@ package ai.droidpilot.app
 import android.Manifest
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -108,7 +109,7 @@ class MainActivity : AppCompatActivity() {
                 isChecked = prefs.adbEnabled
                 setOnCheckedChangeListener { _, v ->
                     prefs.adbEnabled = v
-                    Toast.makeText(this@MainActivity, if (v) "ADB mode ON" else "ADB mode OFF", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@MainActivity, if (v) "وضع ADB مُفعّل" else "وضع ADB مُعطّل", Toast.LENGTH_SHORT).show()
                 }
             }
             row.addView(cb)
@@ -191,15 +192,15 @@ class MainActivity : AppCompatActivity() {
     private fun saveUrl() {
         val url = etUrl.text.toString().trim().trimEnd('/')
         if (url.isEmpty()) {
-            toast("Enter the Worker URL first")
+            toast("أدخل رابط العامل أولًا")
             return
         }
         if (url.startsWith("http://") && !url.contains("10.0.2.2") && !url.contains("localhost")) {
-            toast("HTTPS only — http:// is allowed only for local dev")
+            toast("HTTPS فقط — الرابط يجب أن يبدأ بـ https://")
             return
         }
         prefs.baseUrl = url
-        toast("Worker URL saved")
+        toast("تم حفظ الرابط ✓")
         refreshStatus()
     }
 
@@ -217,7 +218,7 @@ class MainActivity : AppCompatActivity() {
                 tvDeviceId.text = deviceId
                 tvPin.text = pin
                 pinCard.visibility = LinearLayout.VISIBLE
-                toast("Enter PIN $pin in the Web UI, then enable Accessibility")
+                toast("أدخل الرمز $pin في واجهة الويب ثم فعّل الإتاحة")
                 refreshStatus()
             } catch (t: Throwable) {
                 LogSystem.log("ui", "register failed: ${t.message}")
@@ -227,21 +228,35 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openAccessibilitySettings() {
+        // FIX: open aMiNo's OWN accessibility page (toggle included) instead of
+        // dumping the user into the long general list where it's easy to miss.
         try {
-            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            if (Build.VERSION.SDK_INT >= 31) {
+                val cn = ComponentName(packageName,
+                    ai.droidpilot.app.access.DroidPilotAccessibilityService::class.java.name)
+                val i = Intent(Settings.ACTION_ACCESSIBILITY_DETAILS_SETTINGS)
+                i.putExtra(Intent.EXTRA_COMPONENT_NAME, cn)
+                startActivity(i)
+            } else {
+                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }
         } catch (_: Exception) {
-            toast("Accessibility settings unavailable")
+            try {
+                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            } catch (_: Exception) {
+                toast("تعذر فتح إعدادات الإتاحة")
+            }
         }
     }
 
     private fun startConnection() {
         if (!accessibilityEnabled()) {
-            toast("Enable the DroidPilot accessibility service first")
+            toast("فعّل خدمة إتاحة aMiNo أولًا ثم أعد المحاولة")
             openAccessibilitySettings()
             return
         }
         if (!prefs.isPaired && prefs.deviceId.isNullOrBlank()) {
-            toast("Press Connect first")
+            toast("اضغط «اقتران بالويب» أولًا")
             return
         }
         ContextCompat.startForegroundService(this, Intent(this, ConnectionService::class.java))
@@ -266,12 +281,12 @@ class MainActivity : AppCompatActivity() {
         val connected = ConnectionService.running
         val paired = prefs.isPaired || !prefs.deviceId.isNullOrBlank()
         tvStatus.text = when {
-            connected -> "● Connected"
-            paired -> "○ Paired — service stopped"
-            else -> "○ Not connected"
+            connected -> "● متصل"
+            paired -> "○ مقترن — الخدمة متوقفة"
+            else -> "○ غير متصل"
         }
-        tvDevice.text = "Device: ${prefs.deviceId ?: "—"} (${Build.MODEL})"
-        tvA11y.text = "Accessibility: ${if (accessibilityEnabled()) "enabled" else "disabled"}"
+        tvDevice.text = "الجهاز: ${prefs.deviceId ?: "—"} (${Build.MODEL})"
+        tvA11y.text = "الإتاحة: ${if (accessibilityEnabled()) "مُفعّلة ✓" else "معطّلة — فعّلها من الزر أدناه"}"
         val lines = LogSystem.dump(14)
         tvLog.text = lines.joinToString("\n")
     }

@@ -15,7 +15,6 @@ import java.security.Signature
 import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
-import java.util.zip.CRC32
 
 /**
  * Minimal classic ADB client (TCP, port 5555) — Aiminos deep-control layer.
@@ -34,14 +33,24 @@ class AdbClient private constructor(
     private val outS: BufferedOutputStream
 ) {
     companion object {
-        const val A_CNXN = 0x434E584E
-        const val A_AUTH = 0x41555448
-        const val A_OPEN = 0x4F50454E
-        const val A_OKAY = 0x4F4B4159
-        const val A_WRTE = 0x57525445
-        const val A_CLSE = 0x434C5345
+        // FIX: ADB command constants are the ASCII command strings read as
+        // LITTLE-ENDIAN u32 (AOSP protocol.h): "CNXN" = 0x4e584e43. The previous
+        // big-endian readings produced "NXNC"-style garbage on the wire.
+        const val A_CNXN = 0x4e584e43
+        const val A_AUTH = 0x48545541
+        const val A_OPEN = 0x4e45504f
+        const val A_OKAY = 0x59414b4f
+        const val A_WRTE = 0x45545257
+        const val A_CLSE = 0x45534c43
         const val A_VERSION = 0x01000001
         const val MAX_PAYLOAD = 4096
+
+        /** ADB checksum = plain additive byte-sum (NOT CRC32 — see AOSP adb_client.c). */
+        private fun checksum(data: ByteArray): Int {
+            var sum = 0
+            for (b in data) sum += b.toInt() and 0xFF
+            return sum
+        }
 
         private fun le32(b: ByteArray, off: Int): Int =
             (b[off].toInt() and 0xFF) or
@@ -121,8 +130,7 @@ class AdbClient private constructor(
                 if (n < 0) throw IOException("adb stream closed (payload)")
                 o2 += n
             }
-            val crc = CRC32().apply { update(d) }
-            if (crc.value.toInt() != check) throw IOException("adb checksum mismatch")
+            if (checksum(d) != check) throw IOException("adb checksum mismatch")
             d
         } else ByteArray(0)
         return Msg(cmd, arg0, arg1, data)
@@ -132,8 +140,7 @@ class AdbClient private constructor(
         val h = ByteArray(24)
         putLE32(h, 0, cmd); putLE32(h, 4, arg0); putLE32(h, 8, arg1)
         putLE32(h, 12, data.size)
-        val crc = CRC32().apply { update(data) }
-        putLE32(h, 16, crc.value.toInt())
+        putLE32(h, 16, checksum(data))
         putLE32(h, 20, cmd.inv())
         outS.write(h); outS.write(data); outS.flush()
     }

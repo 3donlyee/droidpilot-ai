@@ -127,6 +127,17 @@ class AdbPairingService : Service() {
                 code = code.filter { it.isDigit() }
                 var manual = fromInput?.getCharSequence(KEY_MANUAL_ENDPOINT)?.toString()?.trim()
                 if (manual.isNullOrBlank()) manual = null
+                // FIX: after a successful PAIRING, a manual entry is a CONNECT
+                // endpoint (ColorOS mDNS is often blocked) — verify it directly.
+                if ((phase == STATE_PAIRED || phase == STATE_CONNECTING) && manual != null) {
+                    val port = manual.substringAfterLast(':').toIntOrNull()
+                    if (port != null && port in 1024..65535) {
+                        verifyConnection(port)
+                    } else {
+                        updateNotification(STATE_PAIRED, "الصيغة يجب أن تكون IP:منفذ مثل 192.168.1.7:39045")
+                    }
+                    return START_NOT_STICKY
+                }
                 if (code.length >= 6) {
                     pendingCode = code.take(6)
                     if (manual != null) manualEndpoint = manual
@@ -137,11 +148,7 @@ class AdbPairingService : Service() {
             }
             ACTION_ENDPOINT -> {
                 val ep = intent.getStringExtra(EXTRA_ENDPOINT)
-                if (!ep.isNullOrBlank() && pairingPort <= 0 && manualEndpoint == null) {
-                    manualEndpoint = ep
-                    LogSystem.log("adb", "accessibility watcher found endpoint: $ep")
-                    tryPairIfReady()
-                }
+                if (!ep.isNullOrBlank()) handleEndpoint(ep)
             }
             ACTION_CANCEL -> {
                 stopEverything()
@@ -180,10 +187,7 @@ class AdbPairingService : Service() {
         acquireMulticast()
         endpointListener = { ep ->
             handler.post {
-                if (pairingPort <= 0 && manualEndpoint == null) {
-                    manualEndpoint = ep
-                    tryPairIfReady()
-                }
+                handleEndpoint(ep)
             }
         }
         // Arm the (cheap) accessibility watcher as fallback for the port.
@@ -201,6 +205,33 @@ class AdbPairingService : Service() {
         }
         mdnsPairing = mdns
         mdns.start()
+    }
+
+    /**
+     * FIX: one router for every discovered/typed endpoint.
+     *  - WAITING phase  → it is the PAIRING endpoint → try to pair.
+     *  - PAIRED phase   → it is the CONNECT endpoint (the Wireless debugging
+     *    main dialog shows IP:port of the connect service) → verify directly.
+     *  Without this, after pairing on ColorOS (mDNS blocked) the app waited
+     *  forever on «جارٍ البحث عن منفذ الاتصال…».
+     */
+    private fun handleEndpoint(ep: String) {
+        val idx = ep.lastIndexOf(':')
+        if (idx <= 0) return
+        val port = ep.substring(idx + 1).toIntOrNull() ?: return
+        LogSystem.log("adb", "endpoint in phase=$phase: $ep")
+        when (phase) {
+            STATE_PAIRED, STATE_CONNECTING -> {
+                if (port in 1024..65535) verifyConnection(port)
+            }
+            STATE_WAITING -> {
+                if (pairingPort <= 0 && manualEndpoint == null) {
+                    manualEndpoint = ep
+                    tryPairIfReady()
+                }
+            }
+            else -> {}
+        }
     }
 
     // ------------------------------------------------------------- pairing
@@ -237,7 +268,10 @@ class AdbPairingService : Service() {
                     prefs.adbLastPairPort = port
                     phase = STATE_PAIRED
                     notifyState(STATE_PAIRED, "ADB مقترن بنجاح")
-                    updateNotification(STATE_PAIRED, "ADB مقترن بنجاح — جارٍ البحث عن منفذ الاتصال…")
+                    updateNotification(
+                        STATE_PAIRED,
+                        "ADB مقترن بنجاح — أبقِ شاشة «التصحيح اللاسلكي» مفتوحة للعثور على منفذ الاتصال (أو أدخله يدويًا من الزر)"
+                    )
                     handler.removeCallbacks(timeoutRunnable)
                     startConnectionDiscovery()
                 } else {
@@ -334,7 +368,7 @@ class AdbPairingService : Service() {
                 .setLabel("رمز الاقتران (6 أرقام)")
                 .build()
             val remoteEndpoint = RemoteInput.Builder(KEY_MANUAL_ENDPOINT)
-                .setLabel("IP:منفذ — اختياري (يُكتشف تلقائيًا)")
+                .setLabel("IP:منفذ الاقتران — اختياري (يُكتشف تلقائيًا)")
                 .build()
             val codeIntent = PendingIntent.getService(
                 this, 1,
@@ -354,6 +388,24 @@ class AdbPairingService : Service() {
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
             builder.addAction(NotificationCompat.Action.Builder(0, "إلغاء", cancelIntent).build())
+        }
+
+        // FIX: after pairing succeeded, give the user a manual path to enter the
+        // CONNECT port — ColorOS often blocks mDNS (_adb-tls-connect._tcp).
+        if (state == STATE_PAIRED) {
+            val remoteEndpoint = RemoteInput.Builder(KEY_MANUAL_ENDPOINT)
+                .setLabel("IP:منفذ الاتصال من شاشة التصحيح اللاسلكي")
+                .build()
+            val connectIntent = PendingIntent.getService(
+                this, 3,
+                Intent(this, AdbPairingService::class.java).setAction(ACTION_CODE),
+                PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+            val connectAction = NotificationCompat.Action.Builder(0, "إدخال منفذ الاتصال", connectIntent)
+                .addRemoteInput(remoteEndpoint)
+                .setAllowGeneratedReplies(false)
+                .build()
+            builder.addAction(connectAction)
         }
         return builder
     }

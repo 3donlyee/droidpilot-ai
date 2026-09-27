@@ -29,6 +29,7 @@ class AdbMdns(
     private var registered = false
     private var running = false
     private var serviceName: String? = null
+    private var resolving = false
     private val listener = DiscoveryListener(this)
     private val nsdManager: NsdManager = context.getSystemService(NsdManager::class.java)
 
@@ -63,10 +64,21 @@ class AdbMdns(
         registered = false
     }
 
+    private fun onDiscoveryFailed() {
+        registered = false
+        running = false
+    }
+
     private fun onServiceFound(info: NsdServiceInfo) {
+        // FIX: NsdManager allows very few concurrent resolves — concurrent calls
+        // used to throw (silently swallowed) and the service was never resolved.
+        if (resolving) return
         try {
+            resolving = true
             nsdManager.resolveService(info, ResolveListener(this))
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+            resolving = false
+        }
     }
 
     private fun onServiceLost(info: NsdServiceInfo) {
@@ -96,10 +108,20 @@ class AdbMdns(
         }
     }
 
-    /** The port is ours when nothing else in this process already bound it on localhost. */
+    internal fun onResolveFinished() {
+        resolving = false
+    }
+
+    /**
+     * FIX: the availability probe used to bind 127.0.0.1:port — when adbd binds
+     * its port to a specific interface address (ColorOS), a 127.0.0.1 bind
+     * SUCCEEDS and the real service got filtered out ("stuck at waiting").
+     * A wildcard bind (Shizuku's approach) fails whenever ANYONE holds the port,
+     * which is exactly the signal we want: bind fails ⇒ port is genuinely in use.
+     */
     private fun isPortAvailable(port: Int): Boolean = try {
         ServerSocket().use {
-            it.bind(InetSocketAddress("127.0.0.1", port), 1)
+            it.bind(InetSocketAddress(port), 1)
             false
         }
     } catch (e: IOException) {
@@ -114,6 +136,8 @@ class AdbMdns(
 
         override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
             Log.v(TAG, "onStartDiscoveryFailed: $serviceType, $errorCode")
+            // FIX: reset flags so a later start() can retry (used to stay "running").
+            mdns.onDiscoveryFailed()
         }
 
         override fun onDiscoveryStopped(serviceType: String) {
@@ -137,9 +161,12 @@ class AdbMdns(
     }
 
     internal class ResolveListener(private val mdns: AdbMdns) : NsdManager.ResolveListener {
-        override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {}
+        override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {
+            mdns.onResolveFinished()
+        }
+
         override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
-            mdns.onServiceResolved(serviceInfo)
+            mdns.onResolveFinished()
         }
     }
 

@@ -10,11 +10,13 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
+import android.text.InputType
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import ai.droidpilot.app.core.ApiClient
@@ -24,7 +26,7 @@ import org.json.JSONObject
 import java.util.Locale
 
 /**
- * Aiminos Voice Panel — appears when the user taps the Accessibility button.
+ * aMiNo Voice Panel — appears when the user taps the Accessibility button.
  *
  *   🎤 speak → Speech-to-Text → POST /api/chat (source:"voice") → poll turn → TTS reply
  *   ⏹ stop   → POST /api/turn/stop
@@ -81,8 +83,8 @@ class VoicePanel(private val context: Context) {
             setPadding(dp(16), dp(12), dp(16), dp(14))
         }
 
-        val title = label("◆ Aiminos", 15f, 0xFF7C5CFF.toInt(), true)
-        status = label("جاهز", 13f, 0xFF8B95A9.toInt())
+        val title = label("◆ aMiNo", 15f, 0xFF7C5CFF.toInt(), true)
+        status = label("جاهز — تكلم أو اكتب أمرك", 13f, 0xFF8B95A9.toInt())
 
         val row = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
         row.addView(button("🎤 تكلم", { startListening() }))
@@ -90,14 +92,41 @@ class VoicePanel(private val context: Context) {
         row.addView(button("▶", { resumeTask() }))
         row.addView(button("✕", { hide() }))
 
+        // FIX: text fallback — speech recognition is a single point of failure
+        // on ColorOS (no recognizer / no ar-DZ / mic denied). Now the user can
+        // ALWAYS type the command. Requires the window to be focusable.
+        val inputRow = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val input = EditText(context).apply {
+            hint = "أو اكتب أمرك هنا…"
+            textSize = 13f
+            inputType = InputType.TYPE_CLASS_TEXT
+            setSingleLine(true)
+            setTextColor(0xFFE9EDF6.toInt())
+            setHintTextColor(0xFF6B7386.toInt())
+            background = bg(0xFF232B3F.toInt(), 12)
+            setPadding(dp(10), dp(8), dp(10), dp(8))
+        }
+        inputRow.addView(input, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        inputRow.addView(button("إرسال", {
+            val txt = input.text.toString().trim()
+            if (txt.isNotEmpty()) {
+                input.setText("")
+                sendToBrain(txt)
+            }
+        }))
+
         col.addView(title)
         col.addView(status)
         col.addView(row)
+        col.addView(inputRow)
 
         val params = WindowManager.LayoutParams().apply {
             type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
-            flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+            // FIX: window must be focusable for the EditText fallback to work.
+            flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
             format = android.graphics.PixelFormat.TRANSLUCENT
             width = WindowManager.LayoutParams.MATCH_PARENT
             height = WindowManager.LayoutParams.WRAP_CONTENT
@@ -170,8 +199,24 @@ class VoicePanel(private val context: Context) {
             override fun onEndOfSpeech() { setStatus("⟳ أفهم ما قلت…") }
             override fun onError(error: Int) {
                 listening = false
-                setStatus("✗ لم أسمعك جيدًا — حاول مرة أخرى")
                 sr.destroy()
+                // FIX: specific Arabic guidance per error instead of the same
+                // misleading «لم أسمعك جيدًا» for everything.
+                setStatus(
+                    when (error) {
+                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS ->
+                            "✗ صلاحية الميكروفون مرفوضة — فعّلها من إعدادات التطبيق أو اكتب الأمر"
+                        SpeechRecognizer.ERROR_NO_MATCH ->
+                            "✗ لم أتعرف على الكلام — حاول مجددًا أو اكتب الأمر"
+                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT ->
+                            "✗ لم أسمع صوتًا — اقترب من الميكروفون أو اكتب الأمر"
+                        SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT ->
+                            "✗ مشكلة شبكة في التعرف على الصوت — اكتب الأمر"
+                        SpeechRecognizer.ERROR_RECOGNIZER_BUSY ->
+                            "✗ التعرف على الصوت مشغول — انتظر ثانية ثم أعد المحاولة"
+                        else -> "✗ خطأ في التعرف على الصوت ($error) — اكتب الأمر"
+                    }
+                )
             }
             override fun onResults(results: android.os.Bundle?) {
                 listening = false
@@ -194,14 +239,31 @@ class VoicePanel(private val context: Context) {
                 val r = api.chat(message, source = "voice")
                 val turnId = r?.optString("turn_id").orEmpty()
                 if (turnId.isBlank()) {
-                    setStatus("✗ ${r?.optString("error") ?: "تعذر الإرسال"}")
+                    // FIX: translate server errors instead of showing raw codes.
+                    val err = r?.optString("error").orEmpty()
+                    setStatus(
+                        when {
+                            err.contains("DEVICE_BUSY") -> "⏳ هناك مهمة قيد التنفيذ — اضغط ⏹ لإيقافها ثم أعد المحاولة"
+                            err.contains("DEVICE_OFFLINE") -> "✗ الهاتف غير متصل بالعقل — افتح التطبيق واضغط «بدء الاتصال»"
+                            err.isBlank() -> "✗ تعذر الإرسال — تحقق من الرابط والاقتران"
+                            else -> "✗ ${err.take(60)}"
+                        }
+                    )
                     return@Thread
                 }
-                val deadline = System.currentTimeMillis() + 180_000
+                // FIX: multi-step tasks legitimately run minutes — follow the
+                // turn while it is alive (was a hard 180 s deadline), and show
+                // progress so the panel never looks dead.
+                val deadline = System.currentTimeMillis() + 420_000
                 while (System.currentTimeMillis() < deadline) {
                     Thread.sleep(3000)
                     val t = api.getTurn(turnId) ?: continue
                     val st = t.optString("state")
+                    if (st == "thinking" || st == "awaiting_device") {
+                        val steps = t.optJSONArray("steps")?.length() ?: 0
+                        setStatus("⟳ يعمل… الخطوة $steps")
+                        continue
+                    }
                     if (st == "done" || st == "stopped" || st == "error") {
                         val final = t.optString("final_response").ifBlank { t.optString("error") }
                         setStatus("◆ ${final.take(90)}")
@@ -210,7 +272,7 @@ class VoicePanel(private val context: Context) {
                         return@Thread
                     }
                 }
-                setStatus("⏱️ انتهت مهلة الاستجابة")
+                setStatus("⏱️ ما زالت المهمة تعمل خلف الكواليس — اضغط ▶ للمتابعة أو ⏹ للإيقاف")
             } catch (t: Throwable) {
                 LogSystem.log("voice", "voice turn failed: ${t.message}")
                 setStatus("✗ ${t.message?.take(60)}")

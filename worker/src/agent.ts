@@ -73,6 +73,21 @@ export async function startTurn(
     deviceInfo = raw ? JSON.parse(raw) : undefined;
   } catch {}
 
+  // FIX: fail fast with a clear Arabic message when the device has been
+  // silent (no poll-driven liveness refresh) for >10 minutes — instead of
+  // letting the turn hang and die on DEVICE_TIMEOUT.
+  const lastSeen = Number(deviceInfo?.last_seen ?? 0);
+  if (deviceInfo && lastSeen > 0 && lastSeen < now() - 10 * 60_000) {
+    return json(
+      {
+        ok: false,
+        error: "DEVICE_OFFLINE",
+        hint: "الهاتف غير متصل بالعقل منذ فترة. افتح تطبيق aMiNo واضغط «بدء الاتصال»، وثبّت التطبيق في شريط المهام الأخيرة ليتجاهله ColorOS.",
+      },
+      409
+    );
+  }
+
   // === aMiNo mind: pick the specialist + load the three-tier memory ===
   const agent = pickAgent(message, agentId ?? null);
   const [memBlock, hist] = await Promise.all([
@@ -264,10 +279,19 @@ export async function applyDeviceResult(
     ok: !!result.success,
     summary,
   });
+  // FIX: screenshots carry a ~100-200 KB base64 payload — feeding that into a
+  // TEXT-ONLY model (nemotron/qwen/gemma :free are supportsVision:false) blows
+  // the context and kills the turn with AI_ERROR. Strip it and tell the model
+  // to use get_screen_nodes instead.
+  const data = { ...(result.data ?? {}) } as Record<string, unknown>;
+  if (data.image_base64 && !getModel(turn.model_id)?.supportsVision) {
+    delete data.image_base64;
+    data.screenshot_note = "[screenshot captured but this model has no vision — call get_screen_nodes]";
+  }
   turn.messages.push({
     role: "tool",
     tool_call_id: result.id,
-    content: JSON.stringify({ tool, success: !!result.success, ...(result.data ?? {}), ...(result.error ? { error: result.error, error_code: result.error_code } : {}) }),
+    content: JSON.stringify({ tool, success: !!result.success, ...data, ...(result.error ? { error: result.error, error_code: result.error_code } : {}) }),
   });
   turn.state = "thinking";
   await saveTurn(env, turn);
@@ -300,6 +324,20 @@ export async function pollCommand(
 ): Promise<Response> {
   const wait = Math.min(Math.max(waitSeconds, 0), 25);
   const deadline = now() + wait * 1000;
+
+  // FIX (cheap liveness): the device long-polls every ≤25 s — refresh last_seen
+  // at most every 4 minutes so startTurn can fail fast with a clear Arabic
+  // message when ColorOS killed the service (KV write quota stays untouched).
+  try {
+    const rawDev = await env.KV_DEVICES.get(`device:${rec.device_id}`);
+    if (rawDev) {
+      const dev = JSON.parse(rawDev);
+      if ((dev.last_seen ?? 0) < now() - 4 * 60_000) {
+        dev.last_seen = now();
+        await env.KV_DEVICES.put(`device:${rec.device_id}`, JSON.stringify(dev));
+      }
+    }
+  } catch {}
 
   for (;;) {
     const raw = await env.KV_DEVICES.get(`pendingcmd:${rec.device_id}`);
@@ -338,9 +376,9 @@ export async function expireIfNeeded(env: Env, turn: Turn): Promise<boolean> {
   let expired: string | null = null;
 
   if (turn.state === "awaiting_device" && turn.pending_since && now() - turn.pending_since > DEVICE_TIMEOUT_MS) {
-    expired = "DEVICE_TIMEOUT: the device did not return a result in time. Is it connected and the service running?";
+    expired = "⏱️ لم يصل جواب من الهاتف خلال 45 ثانية. افتح تطبيق aMiNo وتأكد أن الإشعار يقول «aMiNo متصل»، وأن التطبيق مستثنى من قتل الخلفية في ColorOS (بطارية/قفل التطبيق)، ثم أعد إرسال الأمر.";
   } else if (turn.state === "thinking" && now() - turn.updated_at > AI_TIMEOUT_MS) {
-    expired = "AI_TIMEOUT: the turn stalled.";
+    expired = "⏱️ تجاوز العقل المدبّر وقت الاستجابة — أعد المحاولة.";
   }
 
   if (!expired) return false;

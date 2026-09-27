@@ -46,7 +46,16 @@ export class OpenAICompatProvider implements AIProvider {
       messages: out,
       stream: false,
     };
-    if (tools.length) body.tools = tools;
+    // FIX: without max_tokens some OpenRouter :free models default to a tiny
+    // budget → truncated replies (finish_reason "length") surfaced as an
+    // "(empty response)" final. Also pin tool_choice so tool-calling models
+    // actually emit tool_calls.
+    const maxTokens = Number(this.env.OPENAI_MAX_TOKENS ?? "") || 2000;
+    body.max_tokens = maxTokens;
+    if (tools.length) {
+      body.tools = tools;
+      body.tool_choice = "auto";
+    }
 
     const headers: Record<string, string> = {
       "content-type": "application/json",
@@ -88,6 +97,13 @@ export class OpenAICompatProvider implements AIProvider {
       throw new Error(`AI_HTTP_${res.status}: ${text.slice(0, 300)}`);
     }
     const data: any = await res.json();
-    return { ...parseAnyResponse(data), style: "openai-compat" };
+    const parsed = parseAnyResponse(data);
+    // FIX: a length-truncated response with no tool calls used to end the turn
+    // as "(empty response)". Throw so chatWithFailover retries/fails over.
+    const finish = data?.choices?.[0]?.finish_reason;
+    if (!parsed.toolCalls.length && !parsed.text && finish === "length") {
+      throw new Error(`AI_TRUNCATED: model hit max_tokens (${maxTokens}) — raise OPENAI_MAX_TOKENS or failover`);
+    }
+    return { ...parsed, style: "openai-compat" };
   }
 }

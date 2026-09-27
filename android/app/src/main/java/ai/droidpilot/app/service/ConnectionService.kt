@@ -27,7 +27,7 @@ import kotlinx.coroutines.launch
 /**
  * Foreground service that keeps the connection alive and runs the
  * command loop: poll → execute → report. Visible by design — the
- * notification reads "DroidPilot AI is connected".
+ * notification reads "aMiNo متصل".
  */
 class ConnectionService : Service() {
 
@@ -90,9 +90,27 @@ class ConnectionService : Service() {
                 val cmd = api.poll(waitSeconds = 20)
                 if (cmd != null) {
                     LogSystem.log("conn", "cmd received: ${cmd.tool}")
-                    val result = executor.execute(cmd)
-                    val posted = api.postResult(cmd, result)
-                    LogSystem.log("conn", "result posted: $posted")
+                    // FIX: an executor crash used to fall into the generic catch,
+                    // losing the command's result → worker DEVICE_TIMEOUT → task aborted.
+                    // Always report something back.
+                    val result = try {
+                        executor.execute(cmd)
+                    } catch (t: Throwable) {
+                        LogSystem.log("conn", "executor crash: ${t.message?.take(120)}")
+                        org.json.JSONObject()
+                            .put("success", false)
+                            .put("error_code", "EXECUTOR_CRASH")
+                            .put("error", t.message ?: "executor crashed")
+                    }
+                    // FIX: retry result posting (mobile-network blips used to drop it).
+                    var posted = try { api.postResult(cmd, result) } catch (_: Throwable) { false }
+                    var tries = 0
+                    while (!posted && tries < 3) {
+                        delay(2000)
+                        posted = try { api.postResult(cmd, result) } catch (_: Throwable) { false }
+                        tries++
+                    }
+                    LogSystem.log("conn", "result posted: $posted (tries=${tries + 1})")
                 }
                 backoffMs = 1500L
             } catch (t: Throwable) {
@@ -106,9 +124,9 @@ class ConnectionService : Service() {
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val ch = NotificationChannel(
-                CHANNEL_ID, "DroidPilot Connection", NotificationManager.IMPORTANCE_LOW
+                CHANNEL_ID, "اتصال aMiNo", NotificationManager.IMPORTANCE_LOW
             )
-            ch.description = "Shows when DroidPilot AI is connected"
+            ch.description = "يظهر عندما يكون وكيل aMiNo متصلًا وجاهزًا"
             (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(ch)
         }
     }
@@ -120,8 +138,8 @@ class ConnectionService : Service() {
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_droid)
-            .setContentTitle("DroidPilot AI is connected")
-            .setContentText("Agent ready — waiting for commands")
+            .setContentTitle("aMiNo متصل")
+            .setContentText("الوكيل جاهز — بانتظار الأوامر")
             .setOngoing(true)
             .setContentIntent(pi)
             .build()

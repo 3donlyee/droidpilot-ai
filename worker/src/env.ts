@@ -17,6 +17,8 @@ export interface Env {
   /** Provider API key (OpenRouter: sk-or-v1-…). Set via secret — NEVER in files. */
   OPENAI_API_KEY?: string;
   OPENAI_MODEL_FALLBACK?: string;
+  /** Optional override for the OpenAI-compat max_tokens (default 2000). */
+  OPENAI_MAX_TOKENS?: string;
   /** Model used when the primary is region-blocked (HTTP 403 "not available in your region"). */
   OPENAI_REGION_FALLBACK?: string;
   /** Optional OpenRouter app-attribution overrides */
