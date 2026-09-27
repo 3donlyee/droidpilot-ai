@@ -28,6 +28,15 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+    packaging {
+        resources {
+            // BouncyCastle jdk18on jars each carry OSGI manifests — keep one, drop the duplicates
+            excludes += setOf(
+                "META-INF/versions/9/OSGI-INF/MANIFEST.MF",
+                "META-INF/OSGI-INF/MANIFEST.MF",
+            )
+        }
+    }
 }
 
 dependencies {
