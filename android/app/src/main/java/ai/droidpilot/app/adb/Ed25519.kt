@@ -120,9 +120,9 @@ internal object Ed25519 {
     private var sqrtM1: BigInteger? = null
 
     private fun recoverX(u: BigInteger, v: BigInteger, sign: Int): BigInteger? {
-        val v3 = v.multiply(v).multiply(v).mod(P)
         val exp = P.add(BigInteger.valueOf(3)).divide(BigInteger.valueOf(8))
-        var x = u.multiply(v3).mod(P).modPow(exp, P)
+        // RFC 8032 §5.1.3: candidate root x = (u/v)^((p+3)/8) mod p
+        var x = u.multiply(v.modInverse(P)).mod(P).modPow(exp, P)
         val vx2 = v.multiply(x).multiply(x).mod(P)
         if (vx2.subtract(u).mod(P).signum() != 0) {
             if (vx2.add(u).mod(P).signum() == 0) {
